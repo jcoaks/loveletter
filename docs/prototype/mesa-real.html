@@ -1,0 +1,620 @@
+<title>Tableros Love Letter</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya+Sans:wght@400;500;700&family=Caveat:wght@500;700&family=Cinzel:wght@500;700&family=JetBrains+Mono:wght@500;700&family=Manrope:wght@400;600;800&family=Special+Elite&display=swap">
+<style>
+/* Layout: selector de estilo arriba, un tablero de muestra (4 jugadores, ronda en curso) abajo.
+   El mismo estado de partida se dibuja con tres interfaces distintas. */
+:root {
+  --bg: #f3f2f5; --fg: #1c1b22; --muted: #5f5d6b; --line: #d8d6df; --panel: #ffffff; --accent: #9a2a48; --accent-fg: #ffffff;
+  --display: 'Manrope', system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #121117; --fg: #ececf2; --muted: #a09db0; --line: #2d2b38; --panel: #1b1a23; --accent: #e0708d; --accent-fg: #1a0a10; color-scheme: dark; }
+}
+:root[data-theme="dark"] { --bg: #121117; --fg: #ececf2; --muted: #a09db0; --line: #2d2b38; --panel: #1b1a23; --accent: #e0708d; --accent-fg: #1a0a10; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: 'Manrope', system-ui, sans-serif; font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 1380px; margin: 0 auto; padding-block: 24px 48px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 20px; }
+h1 { font-size: clamp(22px, 4vw, 30px); line-height: 1.15; margin: 0; letter-spacing: -.01em; text-wrap: balance; }
+.sub { color: var(--muted); margin: 6px 0 0; max-width: 62ch; }
+.tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.tab { font: inherit; text-align: left; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); cursor: pointer; display: grid; gap: 2px; min-width: 0; }
+.tab b { font-size: 15px; }
+.tab span { font-size: 12.5px; color: var(--muted); }
+.tab[aria-selected="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.tab:focus-visible, .play:focus-visible, .card:focus-visible, .count button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.meta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; font-size: 13.5px; }
+.meta h3 { margin: 0 0 2px; font-size: 11.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
+.meta p { margin: 0; }
+.count { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.count button { font: inherit; min-width: 44px; min-height: 44px; padding: 6px 12px; border-radius: 99px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); cursor: pointer; }
+.count button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.count .info { color: var(--muted); font-size: 13px; margin-left: 6px; }
+.ref { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); padding: 4px 14px; }
+.ref summary { cursor: pointer; padding: 10px 0; font-weight: 600; }
+.ref table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin-bottom: 12px; }
+.ref th, .ref td { text-align: left; padding: 6px 8px; border-top: 1px solid var(--line); vertical-align: top; }
+.ref td:first-child, .ref td:nth-child(3) { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ref .scroll { overflow-x: auto; }
+@media (max-width: 640px) {
+  .tabs, .meta { grid-template-columns: 1fr; }
+  .tab span { display: none; }
+}
+
+/* ---------- Piezas compartidas ---------- */
+.board { --h: 0; }
+.board svg { display: block; }
+.card { font: inherit; color: inherit; padding: 0; margin: 0; text-align: left; border: 0; background: none; cursor: pointer; position: relative; }
+.hearts { display: flex; flex-wrap: wrap; gap: 2px; align-items: center; }
+.tok { width: 18px; height: 18px; flex: none; display: block; }
+.tok:not(.f) { filter: grayscale(1); opacity: .28; }
+.heart { width: 16px; height: 16px; stroke-width: 1.6; fill: none; stroke: currentColor; opacity: .55; }
+.heart.f { fill: currentColor; opacity: 1; }
+.c0 { --h: 260; } .c1 { --h: 210; } .c2 { --h: 180; } .c3 { --h: 145; } .c4 { --h: 100; } .c5 { --h: 60; } .c6 { --h: 32; } .c7 { --h: 335; } .c8 { --h: 290; } .c9 { --h: 355; }
+.play { font: inherit; font-weight: 700; border: 0; border-radius: 10px; padding: 12px 22px; cursor: pointer; }
+.play[disabled] { opacity: .45; cursor: not-allowed; }
+.act { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.act .hint { font-size: 13px; opacity: .85; flex: 1 1 220px; min-width: 0; }
+
+/* ========== MESA REAL ========== */
+.s-mesa { --card-w-lg: clamp(132px, 17vw, 166px); --card-w-sm: 38px; --wine: #2b0e1b; --wine2: #4a1a31; --gold: #c9a45c; --ivory: #f2e6e3; --ink: #4a1126; --wax: #c23049;
+  background: radial-gradient(ellipse at 50% 35%, var(--wine2), var(--wine) 72%); color: var(--ivory);
+  border-radius: 20px; padding: clamp(12px, 2.5vw, 24px); font-family: 'Alegreya Sans', system-ui, sans-serif; font-size: 16px; display: grid; gap: 16px; }
+.s-mesa .table { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; grid-template-areas: "t t" "l r" "c c" "m m";
+  border: 1px solid rgba(201,164,92,.35); border-radius: 28px; padding: clamp(10px, 2vw, 22px); background: rgba(0,0,0,.14); }
+@media (min-width: 780px) {
+  .s-mesa .table { grid-template-columns: minmax(0,1fr) minmax(0,1.15fr) minmax(0,1fr); grid-template-areas: "t t t" "l c r" "m m m"; border-radius: 56px; }
+  .s-mesa .seat.left, .s-mesa .seat.right { align-self: center; }
+}
+.s-mesa .seat { background: rgba(0,0,0,.25); border: 1px solid rgba(201,164,92,.28); border-radius: 14px; padding: 12px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.s-mesa .topRow { grid-area: t; display: flex; flex-wrap: wrap; justify-content: space-evenly; gap: 12px; min-width: 0; }
+.s-mesa .topRow .seat { flex: 0 1 calc(50% - 6px); min-width: 150px; }
+@media (min-width: 780px) { .s-mesa .topRow .seat { flex-basis: 31.7%; } }
+.s-mesa .left { grid-area: l; } .s-mesa .right { grid-area: r; }
+.s-mesa .table.few { grid-template-columns: minmax(0, 1fr); grid-template-areas: "t" "c" "m"; border-radius: 28px; }
+.s-mesa .table.notop { grid-template-areas: "l r" "c c" "m m"; }
+@media (min-width: 780px) { .s-mesa .table.notop { grid-template-areas: "l c r" "m m m"; } }
+.s-mesa .hd { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.s-mesa .hd b { font-family: 'Cinzel', serif; font-size: 15px; letter-spacing: .06em; }
+.s-mesa .chip { font-style: normal; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--gold); color: var(--gold); }
+.s-mesa .out { opacity: .72; filter: grayscale(.6); }
+.s-mesa .out .chip { border-color: #d98a98; color: #d98a98; }
+.s-mesa .lbl { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: rgba(242,230,227,.6); }
+.s-mesa .backs { display: flex; min-height: calc(var(--card-w-sm) * 1.4); }
+.s-mesa .back { width: var(--card-w-sm); aspect-ratio: 5/7; flex: none; border-radius: 4px; border: 1px solid var(--gold); background: url(assets/card-back.jpg) center / 100% 100% no-repeat, repeating-linear-gradient(45deg, #5a1d38 0 4px, #3a1226 4px 8px); box-shadow: 0 2px 6px rgba(0,0,0,.4); display: block; }
+.s-mesa .fan > * + *, .s-mesa .backs > * + * { margin-left: calc(var(--card-w-sm) * -.32); }
+.s-mesa .fan { display: flex; min-height: calc(var(--card-w-sm) * 1.4); padding-left: 4px; }
+.s-mesa .mini { position: relative; overflow: hidden; width: var(--card-w-sm); aspect-ratio: 5/7; flex: none; border-radius: 4px; background: linear-gradient(160deg, #f1dca5, #e0bf7e); color: #5a1230; display: grid; place-items: center; align-content: center; gap: 1px; box-shadow: 0 2px 5px rgba(0,0,0,.4); border: 1px solid var(--gold); }
+.s-mesa .mini b { font-family: 'Cinzel', serif; font-size: 16px; line-height: 1; }
+.s-mesa .mini svg { width: 16px; height: 16px; color: #8a2347; }
+.s-mesa .mini .art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; }
+.s-mesa .mini.has-art svg { display: none; }
+.s-mesa .mini.has-art b { position: absolute; left: 1px; top: 1px; width: 17px; height: 17px; border-radius: 50%; background: #5a1230; color: #f4d98b; border: 1px solid #d9b35f; font-size: 11px; display: grid; place-items: center; }
+.s-mesa .hearts { color: var(--wax); }
+.s-mesa .center { grid-area: c; display: flex; flex-wrap: nowrap; gap: 16px; align-items: stretch; justify-content: space-between; padding: 6px; }
+.s-mesa .center .pile { flex: none; }
+.s-mesa .pile { display: grid; gap: 6px; justify-items: center; align-content: center; }
+.s-mesa .stack { position: relative; width: var(--card-w-sm); aspect-ratio: 5/7; }
+.s-mesa .stack .back { position: absolute; width: 100%; margin: 0; left: 0; top: 0; }
+.s-mesa .stack .back:nth-child(2) { left: 3px; top: -3px; } .s-mesa .stack .back:nth-child(3) { left: 6px; top: -6px; }
+.s-mesa .stack em { position: absolute; inset: 0; display: grid; place-items: center; font-style: normal; font-family: 'Cinzel', serif; font-weight: 700; font-size: 18px; z-index: 3; text-shadow: 0 1px 4px #000; transform: translate(6px, -6px); }
+.s-mesa .turn { flex: 1 1 0; min-width: 0; font-family: 'Cinzel', serif; letter-spacing: .1em; text-transform: uppercase; font-size: 14px; text-align: center; color: var(--gold); border-block: 1px solid rgba(201,164,92,.45); padding: 8px 10px; display: grid; align-content: center; }
+.s-mesa .turn small { display: block; font-family: 'Alegreya Sans', sans-serif; letter-spacing: 0; text-transform: none; font-size: 14px; color: var(--ivory); opacity: .8; }
+.s-mesa .me { grid-area: m; display: grid; gap: 12px; justify-items: center; padding-top: 6px; }
+.s-mesa .hand { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; }
+.s-mesa .card { position: relative; container-type: inline-size; display: block; width: var(--card-w-lg); aspect-ratio: 5/7; border-radius: 8px; overflow: hidden; background: linear-gradient(160deg, #f1dca5, #e0bf7e); color: var(--ink); border: 2px solid #8c6a2e; padding: 0; box-shadow: 0 8px 18px rgba(0,0,0,.45); transition: transform .15s, box-shadow .15s; }
+.s-mesa .card.has-art { border: 0; }
+.s-mesa .card::before { content: ""; position: absolute; inset: 2.5%; border: 1px solid #a67c37; border-radius: 5px; box-shadow: inset 0 0 0 3px #ecd49a, inset 0 0 0 4px #b98f45; pointer-events: none; }
+.s-mesa .card.has-art::before, .s-mesa .card.has-art .val, .s-mesa .card.has-art .ico { display: none; }
+.s-mesa .card .art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; display: block; }
+@media (hover: hover) { .s-mesa .card:hover { transform: translateY(-4px); } }
+.s-mesa .card.on { transform: translateY(-12px); box-shadow: 0 0 0 3px rgba(201,164,92,.5), 0 14px 24px rgba(0,0,0,.5); }
+.s-mesa .card .val { z-index: 1; position: absolute; left: 4%; top: 3.5%; width: 30%; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(#8a2347, #5a1230); border: 2px solid #d9b35f; color: #f4d98b; display: grid; place-items: center; font-family: 'Cinzel', serif; font-weight: 700; font-size: 17cqw; line-height: 1; }
+.s-mesa .card .ico { position: absolute; left: 8%; top: 17%; width: 84%; height: 58%; display: grid; place-items: center; color: #8a2347; background: linear-gradient(#f6e8c4, #ead3a0); border: 1px solid #a67c37; border-radius: 5px; }
+.s-mesa .card .ico svg { width: 55%; height: 55%; }
+.s-mesa .card .nm { position: absolute; left: 36%; top: 6.5%; width: 45%; height: 7.5%; display: grid; place-items: center; font-family: 'Cinzel', serif; font-weight: 700; font-size: 6.4cqw; letter-spacing: .02em; text-transform: uppercase; white-space: nowrap; line-height: 1; color: #4a1126; }
+.s-mesa .card .fx { position: absolute; left: 13%; top: 80.5%; width: 74%; height: 11.5%; display: grid; place-items: center; overflow: hidden; font-size: max(9px, 6.4cqw); font-weight: 500; line-height: 1.12; text-align: center; color: #4a1126; }
+.s-mesa .card:not(.has-art) .nm, .s-mesa .card:not(.has-art) .fx { background: rgba(255,248,225,.7); border: 1px solid #a67c37; border-radius: 3px; }
+.s-mesa .card .lk { display: none; }
+.s-mesa .card.lock { filter: saturate(.3) brightness(.8); }
+.s-mesa .card.lock .lk { display: block; position: absolute; left: 6%; right: 6%; bottom: 5%; z-index: 2; background: var(--ink); color: var(--ivory); font-size: 12px; text-align: center; padding: 3px 4px; border-radius: 4px; }
+.s-mesa .card.lock .fx { visibility: hidden; }
+.s-mesa .play { background: var(--wax); color: #fff; font-family: 'Cinzel', serif; letter-spacing: .06em; }
+.s-mesa .log { margin: 0; padding: 12px 4px 0; list-style: none; border-top: 1px solid rgba(201,164,92,.3); display: grid; gap: 4px; font-size: 14.5px; color: rgba(242,230,227,.85); }
+.s-mesa .log li::before { content: "❦ "; color: var(--gold); }
+.s-mesa .seat[data-view], .s-mesa .mine { cursor: pointer; transition: border-color .15s, background .15s; }
+.s-mesa .seat[data-view]:hover, .s-mesa .seat[data-view]:focus-visible { border-color: var(--gold); background: rgba(0,0,0,.4); }
+.s-mesa .mine { padding: 6px 12px; border-radius: 10px; border: 1px dashed rgba(201,164,92,.35); }
+.s-mesa .mine:hover, .s-mesa .mine:focus-visible { border-color: var(--gold); }
+.s-mesa .veil { position: fixed; inset: 0; z-index: 50; background: rgba(12,3,9,.82); display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top, 0px)) 16px max(16px, env(safe-area-inset-bottom, 0px)); overflow: auto; }
+.s-mesa .sheet { width: min(820px, 100%); max-height: 100%; overflow: auto; background: linear-gradient(var(--wine2), var(--wine)); border: 1px solid var(--gold); border-radius: 18px; padding: 18px; display: grid; gap: 16px; }
+.s-mesa .sh-hd { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.s-mesa .sh-hd h3 { margin: 0 0 4px; font-family: 'Cinzel', serif; font-size: 20px; letter-spacing: .06em; }
+.s-mesa .x { font: inherit; font-size: 26px; line-height: 1; flex: none; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--gold); background: none; color: var(--gold); cursor: pointer; }
+.s-mesa .dgrid { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; }
+.s-mesa .dwrap { display: grid; gap: 6px; justify-items: center; }
+.s-mesa .card.static { cursor: default; transition: none; }
+.s-mesa .card.static:hover { transform: none; }
+
+.s-mesa .seat.picked { border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold); }
+.s-mesa .seat.hit { box-shadow: 0 0 0 3px var(--wax), 0 0 24px rgba(194,48,73,.6); }
+.s-mesa .seat.miss { box-shadow: 0 0 0 3px rgba(242,230,227,.4); }
+.s-mesa .rtxt { margin: 0; font-size: 17px; text-align: center; }
+.s-mesa .guess { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.s-mesa .gbtn { font: inherit; cursor: pointer; display: grid; justify-items: center; min-width: 84px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--gold); background: var(--ivory); color: var(--ink); }
+.s-mesa .gbtn b { font-family: 'Cinzel', serif; font-size: 20px; line-height: 1.1; }
+.s-mesa .gbtn span { font-size: 13px; }
+.s-mesa .gbtn:hover, .s-mesa .gbtn:focus-visible { background: #fff; outline: 2px solid var(--gold); }
+.s-mesa .ghost { font: inherit; min-height: 44px; background: none; border: 1px solid rgba(201,164,92,.6); color: var(--gold); border-radius: 8px; padding: 6px 14px; cursor: pointer; }
+.s-mesa .row2 { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.count .info { margin-left: 10px; }
+.s-mesa .faces { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+.s-mesa .faces .card.opt { cursor: pointer; font: inherit; text-align: left; }
+.s-mesa .faces .card.opt:hover, .s-mesa .faces .card.opt:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.s-mesa .mine.out { opacity: .75; }
+.s-mesa .mainCol { display: grid; gap: 16px; min-width: 0; }
+.s-mesa .guide { color: var(--ink); text-align: left; cursor: pointer; background: var(--ivory); border: 2px solid var(--gold); border-radius: 14px; padding: 12px; display: grid; gap: 8px; box-shadow: 0 8px 18px rgba(0,0,0,.45); transition: transform .15s; width: min(100%, 420px); justify-self: center; }
+.s-mesa .guide:hover, .s-mesa .guide:focus-visible { transform: translateY(-3px); outline: 3px solid rgba(201,164,92,.6); }
+.s-mesa .guide h4 { margin: 0; font-family: 'Cinzel', serif; font-size: 14px; letter-spacing: .1em; text-transform: uppercase; text-align: center; }
+.s-mesa .guide ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
+.s-mesa .guide li { display: grid; grid-template-columns: 22px 1fr auto; column-gap: 6px; align-items: baseline; border-top: 1px solid rgba(74,17,38,.2); padding-top: 5px; }
+.s-mesa .guide li b { font-family: 'Cinzel', serif; font-size: 16px; color: var(--wax); }
+.s-mesa .guide li .n { font-family: 'Cinzel', serif; font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+.s-mesa .guide li .q { font-size: 12px; opacity: .7; }
+.s-mesa .guide li small { grid-column: 2 / 4; font-size: 12px; line-height: 1.2; opacity: .85; }
+.s-mesa .guide .zoom { font-size: 12px; text-align: center; opacity: .8; letter-spacing: .08em; text-transform: uppercase; }
+@media (min-width: 1200px) {
+  .s-mesa { grid-template-columns: minmax(0, 1fr) 236px; align-items: start; }
+  .s-mesa .guide { position: sticky; top: 12px; width: auto; }
+}
+.s-mesa .ptiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+.s-mesa .ptile { font: inherit; color: inherit; text-align: left; display: grid; gap: 8px; align-content: start; padding: 12px; border-radius: 12px; border: 1px solid var(--gold); background: rgba(0,0,0,.3); cursor: pointer; }
+.s-mesa .ptile b { font-family: 'Cinzel', serif; letter-spacing: .06em; }
+.s-mesa .ptile:hover, .s-mesa .ptile:focus-visible { background: rgba(201,164,92,.18); outline: 2px solid var(--gold); }
+.s-mesa .ptile.off { opacity: .45; cursor: not-allowed; border-color: rgba(201,164,92,.25); }
+.s-mesa .sheet.wide { width: min(960px, 100%); }
+.s-mesa .glist { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 10px; }
+.s-mesa .glist li { display: grid; grid-template-columns: 40px 32px minmax(0, 1fr); gap: 10px; align-items: start; background: var(--ivory); color: var(--ink); border: 2px solid var(--gold); border-radius: 12px; padding: 10px; }
+.s-mesa .glist .gv { font-family: 'Cinzel', serif; font-weight: 700; font-size: 32px; line-height: 1; color: var(--wax); text-align: center; }
+.s-mesa .glist .gi { color: var(--wax); }
+.s-mesa .glist .gi svg { width: 30px; height: 30px; }
+.s-mesa .glist b { font-family: 'Cinzel', serif; letter-spacing: .06em; text-transform: uppercase; font-size: 15px; }
+.s-mesa .glist i { font-style: normal; opacity: .7; }
+.s-mesa .glist p { margin: 4px 0 0; font-size: 15px; line-height: 1.3; }
+.s-mesa .gnote { display: grid; gap: 6px; font-size: 15px; color: rgba(242,230,227,.9); }
+.s-mesa .gnote p { margin: 0; }
+
+/* Foco visible sobre fondo vino, estados de turno, avisos y ventanas */
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.s-mesa :focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+.s-mesa .sheet:focus { outline: none; }
+body:has(.veil) { overflow: hidden; }
+.s-mesa .chip.on { background: var(--gold); color: var(--ink); font-weight: 700; }
+.s-mesa .out .chip.on { background: none; }
+.s-mesa .seat.turnof { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(201,164,92,.55); }
+.s-mesa .turn.mine { background: rgba(201,164,92,.14); color: #f0d594; }
+.s-mesa .lbl.priv::before { content: "\1F512\FE0E  "; }
+.s-mesa .logh { margin: 0; font-family: 'Cinzel', serif; letter-spacing: .1em; }
+.s-mesa .log { padding-top: 8px; }
+.s-mesa .log li:first-child { color: var(--ivory); font-weight: 700; }
+.s-mesa .log li::before { content: "❦ " / ""; }
+.s-mesa .sheet.hit { border-color: var(--wax); box-shadow: 0 0 0 2px var(--wax); }
+.s-mesa .sheet.warn { border-color: var(--wax); }
+.s-mesa .sheet .row2 { padding-top: 4px; }
+.s-mesa .sheet .faces, .s-mesa .sheet .rtxt { justify-self: center; }
+.s-mesa .ptile.off { cursor: not-allowed; }
+.s-mesa .toast { position: fixed; z-index: 40; left: 50%; transform: translateX(-50%); bottom: max(16px, env(safe-area-inset-bottom, 0px)); width: min(560px, calc(100% - 32px)); display: flex; gap: 12px; align-items: center; justify-content: space-between; background: var(--wine); border: 1px solid var(--gold); border-radius: 14px; padding: 12px 14px; box-shadow: 0 10px 28px rgba(0,0,0,.6); }
+.s-mesa .toast p { margin: 0; font-size: 16px; min-width: 0; }
+.s-mesa .toast .ghost { flex: none; }
+@media (max-width: 480px) {
+  .s-mesa .center { gap: 8px; }
+  .s-mesa .turn { padding: 8px 6px; letter-spacing: .06em; font-size: 13px; }
+  .s-mesa .toast { flex-wrap: wrap; }
+}
+@media (prefers-reduced-motion: reduce) { .s-mesa .card, .s-mesa .guide, .s-mesa .seat { transition: none; } }
+
+.s-mesa .ptile[aria-pressed="true"] { background: rgba(201,164,92,.28); box-shadow: 0 0 0 2px var(--gold); }
+.s-mesa .gbtn[aria-pressed="true"] { background: var(--gold); outline: 2px solid #fff; }
+.s-mesa .gbtn:disabled { opacity: .4; cursor: not-allowed; }
+.s-mesa .card:disabled { cursor: not-allowed; }
+.s-mesa .hand.wait { opacity: .55; }
+.s-mesa .act.wait .hint { font-size: 15px; }
+.s-mesa .turn .net { font-size: 12px; opacity: .65; margin-top: 2px; }
+.count button:disabled { opacity: .45; cursor: not-allowed; }
+.s-mesa .dwrap { max-width: max(var(--card-w-lg), 160px); text-align: center; }
+.s-mesa .cfx { font-size: 14px; line-height: 1.25; opacity: .9; }
+.s-mesa .faces { align-items: flex-start; }
+/* Centro de la mesa: tres bloques de la misma altura, alineados al centro */
+.s-mesa .center { display: grid; grid-template-columns: minmax(max-content, 1fr) minmax(0, 2.4fr) minmax(max-content, 1fr); gap: 14px; align-items: stretch; justify-content: normal; padding: 6px 0; }
+.s-mesa .center .pile { display: grid; align-content: center; justify-items: center; gap: 8px; }
+.s-mesa .slot { height: calc(var(--card-w-sm) * 1.4 + 6px); display: flex; align-items: center; justify-content: center; }
+.s-mesa .stack { width: calc(var(--card-w-sm) + 6px); height: calc(var(--card-w-sm) * 1.4 + 6px); aspect-ratio: auto; }
+.s-mesa .stack .back { position: absolute; left: 0; top: 6px; margin: 0; width: var(--card-w-sm); }
+.s-mesa .stack .back:nth-child(2) { left: 3px; top: 3px; }
+.s-mesa .stack .back:nth-child(3) { left: 6px; top: 0; }
+.s-mesa .stack em { inset: auto; left: 6px; top: 0; width: var(--card-w-sm); height: calc(var(--card-w-sm) * 1.4); transform: none; }
+.s-mesa .slot .fan { min-height: 0; padding-left: 0; }
+.s-mesa .center .turn { border: 1px solid rgba(201,164,92,.45); border-radius: 12px; display: grid; align-content: center; justify-items: center; gap: 2px; padding: 10px 14px; }
+@media (max-width: 480px) { .s-mesa .center { gap: 8px; } .s-mesa .center .turn { padding: 8px 6px; } }
+.hdr { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; }
+.logo { height: 64px; width: auto; max-width: 100%; }
+.logo-fb { font-family: 'Cinzel', serif; font-size: 26px; color: var(--accent); }
+.s-mesa .bagrow { display: flex; align-items: center; gap: 12px; }
+.s-mesa .bagrow p { margin: 0; }
+.s-mesa .bag { width: 72px; height: auto; flex: none; }
+.s-mesa .center { align-self: center; }
+</style>
+
+<div class="wrap">
+  <header class="hdr">
+    <img class="logo" src="assets/logo.png" alt="Love Letter" width="184" height="64" decoding="async" onerror="this.outerHTML='<b class=logo-fb>Love Letter</b>'">
+    <div><h1>Tablero Mesa Real, edición online</h1>
+    <p class="sub">Edición de 21 cartas con Espía y Canciller, para 2 a 6 jugadores. Ronda de ejemplo: Diego eliminado, Marta protegida y Pablo con un Espía jugado. Elige el número de jugadores y la carta que juegas, y recorre su efecto paso a paso.</p></div>
+  </header>
+    <div class="count" id="count" role="group" aria-label="Número de jugadores"></div>
+  <div class="count" id="cardsel" role="group" aria-label="Carta que juegas"></div>
+  <div id="live" class="sr" role="status" aria-live="polite"></div>
+  <div id="stage"></div>
+</div>
+
+<script>
+const C = {
+  0: { n: 'Espía', q: 2, fx: 'Sin efecto al jugarla. Si al cerrar la ronda eres el único que jugó un Espía y sigues en juego, ganas 1 ficha.', sh: 'Sin efecto. Puede darte una ficha.' },
+  1: { n: 'Guardia', q: 6, fx: 'Adivina la carta de otro jugador (no Guardia; el Espía sí vale). Si aciertas, queda fuera.', sh: 'Adivina la carta de otro jugador.' },
+  2: { n: 'Sacerdote', q: 2, fx: 'Mira la mano de otro jugador.', sh: 'Mira la mano de otro.' },
+  3: { n: 'Barón', q: 2, fx: 'Compara tu mano con la de otro jugador. La más baja queda fuera.', sh: 'Compara manos. La más baja sale.' },
+  4: { n: 'Doncella', q: 2, fx: 'Hasta tu próximo turno, nadie puede elegirte.', sh: 'Nadie puede elegirte hasta tu turno.' },
+  5: { n: 'Príncipe', q: 2, fx: 'Un jugador (puedes ser tú) descarta su mano y roba. Si descarta la Princesa, queda fuera.', sh: 'Alguien descarta y roba carta.' },
+  6: { n: 'Canciller', q: 2, fx: 'Roba 2 cartas, quédate con 1 y pon las otras 2 al fondo del mazo en el orden que quieras.', sh: 'Roba 2, conserva 1, 2 al fondo.' },
+  7: { n: 'Rey', q: 1, fx: 'Intercambia tu mano con la de otro jugador.', sh: 'Cambia tu mano con la de otro.' },
+  8: { n: 'Condesa', q: 1, fx: 'Si tienes Rey o Príncipe en la mano, debes jugar la Condesa.', sh: 'Obligatoria si tienes Rey o Príncipe.' },
+  9: { n: 'Princesa', q: 1, fx: 'Si la descartas, quedas fuera.', sh: 'Si la descartas, sales.' }
+};
+const DET = { 0: 'el', 1: 'el', 2: 'el', 3: 'el', 4: 'la', 5: 'el', 6: 'el', 7: 'el', 8: 'la', 9: 'la' };
+// Arte por carta: al llegar una imagen nueva, agregar solo una línea (ej. 1: 'assets/card-1.jpg'). Sin arte se dibuja el fallback.
+const ART = { 0: 'assets/card-0.jpg', 1: 'assets/card-1.jpg', 5: 'assets/card-5.jpg', 2: 'assets/card-2.jpg', 3: 'assets/card-3.jpg', 4: 'assets/card-4.jpg', 6: 'assets/card-6.jpg', 7: 'assets/card-7.jpg', 8: 'assets/card-8.jpg', 9: 'assets/card-9.jpg' };
+const BAD = new Set();
+const hasArt = v => ART[v] && !BAD.has(v);
+const artCls = v => hasArt(v) ? ' has-art' : '';
+const artImg = (v, w = 378, h = 529) => hasArt(v) ? `<img class="art" src="${ART[v]}" alt="" width="${w}" height="${h}" loading="${w > 100 ? 'eager' : 'lazy'}" decoding="async" onerror="BAD.add(${v});this.parentNode.classList.remove('has-art');this.remove()">` : '';
+const G = {
+  0: '<path d="M3 9c3-2 6-2 9 0 3-2 6-2 9 0v3c0 3-3 4-5 3l-4-2-4 2c-2 1-5 0-5-3z"/>',
+  1: '<path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/>',
+  2: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  3: '<path d="M12 4v16M6 20h12M5 7h14M5 7l-3 7a3 3 0 006 0zM19 7l-3 7a3 3 0 006 0z"/>',
+  4: '<rect x="6" y="11" width="12" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/>',
+  5: '<path d="M20 12a8 8 0 11-3-6.2M20 4v4h-4"/>',
+  6: '<path d="M7 3h10v14a3 3 0 003 3H8a3 3 0 01-3-3V6a3 3 0 012-3zM9 8h6M9 12h6"/>',
+  7: '<path d="M3 18l1.5-10 5 5L12 5l2.5 8 5-5L21 18zM4 21h16"/>',
+  8: '<path d="M6 4h12l4 6-10 11L2 10zM2 10h20"/>',
+  9: '<path d="M12 21s-8-5-8-11a4.5 4.5 0 018-2.5A4.5 4.5 0 0120 10c0 6-8 11-8 11z"/>'
+};
+const ico = v => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${G[v]}</svg>`;
+
+// "card" es la carta oculta que tiene cada rival en la mano; solo la usan las demos de las cartas con efecto.
+const ALL = [
+  { name: 'Tú', g: 'm', me: true, pile: [1], tokens: 1 },
+  { name: 'Marta', g: 'f', pile: [1, 4], tokens: 2, prot: true, card: 4 },
+  { name: 'Diego', g: 'm', out: true, pile: [2, 3, 1], tokens: 0 },
+  { name: 'Lucía', g: 'f', pile: [1, 1], tokens: 1, card: 3 },
+  { name: 'Pablo', g: 'm', pile: [0], tokens: 0, spy: true, card: 9 },
+  { name: 'Sofía', g: 'f', pile: [5], tokens: 1, card: 2 }
+];
+const GOAL = { 2: 6, 3: 5, 4: 4, 5: 3, 6: 3 };
+const COMP = { 0: 5, 1: 5, 2: 6, 3: 5, 4: 2, 5: 3, 6: 2, 7: 4, 8: 7, 9: 3 }; // carta que acompaña a la que juegas
+const GUESS = [0, 2, 3, 4, 5, 6, 7, 8, 9];
+const TGT = [1, 2, 3, 5, 7];       // cartas que piden elegir jugador
+const CHANC = [3, 9];              // cartas que roba el Canciller en la demo
+const DRAW_SELF = 6;               // carta que robas con un Príncipe sobre ti
+const PROMPT = { 1: 'Elige a quién acusar.', 2: 'Elige de quién mirar la mano.', 3: 'Elige con quién comparar manos.', 5: 'Elige quién descarta su mano y roba.', 7: 'Elige con quién intercambiar manos.' };
+const S = { n: 6, scn: 8, sel: 8, round: 3, step: 0, played: null, target: null, res: null, view: null, guide: false, confirm: false, gsel: null };
+
+const handOf = v => v === 8 ? [7, 8] : [v, COMP[v]];
+const eligible = (p, v) => !p.out && !p.prot && (v === 5 || !p.me);
+const other = () => S.hand.find((x, i) => i !== S.hand.indexOf(S.played));
+
+function applyPlay() {
+  const r = S.res, v = S.played, me = S.players[0];
+  const T = r.t && S.players.find(p => p.name === r.t);
+  const rest = r.rest;
+  S.hand.splice(S.hand.indexOf(v), 1);
+  me.pile.push(v);
+  let line = `Tú jugaste ${DET[v]} ${C[v].n}`;
+  if (r.none) line += ' sin efecto: todos los rivales están protegidos o eliminados.';
+  else if (v === 0) { me.spy = true; line += '. Si al cierre eres el único que jugó uno, ganarás una ficha.'; }
+  else if (v === 1) {
+    if (r.hit) { T.out = true; T.pile.push(r.tc); r.tOut = true; line += ` contra ${r.t}: era ${C[r.g].n}. ${r.t} queda fuera.`; }
+    else line += `: acusaste a ${r.t} de tener ${C[r.g].n} y fallaste.`;
+  } else if (v === 2) line += ` y miraste la mano de ${r.t}.`;
+  else if (v === 3) {
+    if (rest > r.tc) { T.out = true; T.pile.push(r.tc); r.tOut = true; line += ` contra ${r.t}: ${r.t} tenía la mano más baja y queda fuera.`; }
+    else if (rest < r.tc) { me.out = true; me.pile.push(rest); S.hand = []; line += ` contra ${r.t}: tu mano era la más baja y quedas fuera.`; }
+    else line += ` contra ${r.t}: empate, nadie queda fuera.`;
+  } else if (v === 4) { me.prot = true; line += '. Nadie podrá elegirte hasta tu próximo turno.'; }
+  else if (v === 5) {
+    if (r.t === 'Tú') {
+      me.pile.push(rest);
+      if (rest === 9) { me.out = true; S.hand = []; line += ': te elegiste, descartaste la Princesa y quedas fuera.'; }
+      else { S.hand = [r.drew]; line += `: te elegiste, descartaste ${C[rest].n} y robaste carta.`; }
+    } else {
+      T.pile.push(r.tc);
+      if (r.tc === 9) { T.out = true; r.tOut = true; line += ` contra ${r.t}: descartó la Princesa y queda fuera.`; }
+      else line += ` contra ${r.t}: descartó ${C[r.tc].n} y robó una carta nueva.`;
+    }
+  } else if (v === 6) { S.hand = [r.opts[r.keep]]; line += ': robó 2 cartas, conservó 1 y puso 2 al fondo del mazo.'; }
+  else if (v === 7) { S.hand = [r.tc]; line += ` contra ${r.t}: intercambiaron manos.`; }
+  else if (v === 8) line += ' sin efecto. Los demás no saben qué tienes.';
+  else if (v === 9) { me.out = true; me.pile.push(rest); S.hand = []; line += ' y quedas fuera de la ronda.'; }
+  S.log.unshift(line);
+}
+
+function sync() {
+  S.players = ALL.slice(0, S.n).map(p => ({ ...p, pile: [...p.pile] }));
+  S.toWin = GOAL[S.n];
+  S.faceUp = S.n === 2 ? [2, 5, 1] : [];
+  S.hand = handOf(S.scn);
+  const n = S.n;
+  S.log = [
+    `Es tu turno: robaste ${DET[S.hand[1]]} ${C[S.hand[1]].n}.`,
+    n >= 6 && 'Sofía jugó el Príncipe y se obligó a descartar y robar.',
+    n >= 5 && 'Pablo jugó el Espía. Si nadie más juega uno, ganará una ficha.',
+    'Marta jugó la Doncella y queda protegida.',
+    n >= 4 ? 'Diego jugó el Barón contra Lucía. Tenía un Guardia y quedó eliminado.' : n === 3 && 'Diego jugó el Barón contra ti. Su mano era más baja y quedó eliminado.',
+    n >= 4 && 'Lucía jugó el Guardia: te acusó de tener un Barón y falló.'
+  ].filter(Boolean);
+  if (S.step >= 3) applyPlay();
+  if (S.step === 4) S.log.unshift(`Turno de ${nextP().name}: esperando su jugada.`);
+  if (!S.hand.includes(S.sel)) S.sel = S.hand[0];
+  const removed = S.n === 2 ? 4 : 1;
+  const hands = S.players.reduce((a, p) => a + (p.me ? S.hand.length : p.out ? 0 : 1), 0);
+  const piles = S.players.reduce((a, p) => a + p.pile.length, 0);
+  S.deck = 21 - removed - hands - piles;
+}
+const by = n => S.players.find(p => p.name === n);
+const locked = v => (v === 5 || v === 7) && S.hand.includes(8);
+const back = '<span class="back"></span>';
+const mini = v => `<span class="mini c${v}${artCls(v)}" role="img" aria-label="${C[v].n}" title="${C[v].n}">${artImg(v, 38, 53)}<b>${v}</b>${ico(v)}</span>`;
+const heartSvg = f => `<svg class="heart${f ? ' f' : ''}" viewBox="0 0 24 24" aria-hidden="true">${G[9]}</svg>`;
+const tokFail = img => { img.outerHTML = heartSvg(img.classList.contains('f')); };
+const hearts = n => Array.from({ length: S.toWin }, (_, i) => `<img class="tok${i < n ? ' f' : ''}" src="assets/token.png" alt="" width="18" height="18" decoding="async" onerror="tokFail(this)">`).join('') + `<span class="sr">${n} de ${S.toWin} fichas</span>`;
+const card = v => `<button type="button" class="card c${v}${artCls(v)}${S.sel === v ? ' on' : ''}${locked(v) ? ' lock' : ''}" data-pick="${v}"${S.step || S.confirm ? ' disabled' : ''} aria-pressed="${S.sel === v}" aria-label="${v}, ${C[v].n}. ${C[v].sh}${locked(v) ? ' Bloqueada por la Condesa.' : ''}">${artImg(v)}<span class="val">${v}</span><span class="ico">${ico(v)}</span><span class="nm">${C[v].n}</span><span class="fx">${C[v].sh}</span><span class="lk">Bloqueada por la Condesa</span></button>`;
+const big = (v, extra = '', attr = '', tag = 'div') => `<${tag}${tag === 'button' ? ' type="button"' : ''} class="card c${v}${artCls(v)} static${extra}" ${attr}>${artImg(v)}<span class="val">${v}</span><span class="ico">${ico(v)}</span><span class="nm">${C[v].n}</span><span class="fx">${C[v].sh}</span></${tag}>`;
+const face = v => mini(v);
+const cap = (txt, html) => `<div class="dwrap">${html}<span class="lbl">${txt}</span></div>`;
+const gen = (p, w) => p.g === 'f' ? w.slice(0, -1) + 'a' : w;
+const chipsOf = p => [p.out && gen(p, 'Eliminado'), p.prot && gen(p, 'Protegido'), p.spy && 'Espía jugado'].filter(Boolean).map(t => `<i class="chip">${t}</i>`).join('');
+
+function action() {
+  const blocked = locked(S.sel);
+  const hint = blocked ? `Con la Condesa en la mano no puedes jugar ${C[S.sel].n}.` : S.sel === 8 && S.hand.length === 2 && S.hand.some(c => c === 5 || c === 7) ? 'Con Rey o Príncipe en la mano debes jugar la Condesa.' : C[S.sel].fx;
+  return `<div class="act"><button type="button" class="play" ${blocked ? 'disabled' : ''} aria-describedby="act-hint">Jugar ${C[S.sel].n}</button><span class="hint" id="act-hint">${hint}</span></div>`;
+}
+function describe() {
+  const r = S.res, v = S.played;
+  if (r.none) return ['Sin efecto.', `Todos los rivales están protegidos o eliminados, así que ${DET[v]} ${C[v].n} se descarta sin hacer nada.`, ''];
+  switch (v) {
+    case 0: return ['Espía jugado.', 'No pasa nada ahora. Si al cerrar la ronda eres el único con un Espía jugado y sigues en juego, ganas 1 ficha extra.', ''];
+    case 1: return r.hit ? ['¡Acertaste!', `${r.t} tenía ${C[r.g].n}. Muestra su carta y queda fuera de la ronda.`, '']
+      : ['Fallaste.', `${r.t} no tiene ${C[r.g].n}. Todos ven tu acusación, pero nadie ve su carta.`, ''];
+    case 2: return ['Solo tú ves esto.', `Esta es la carta que tiene ${r.t}. Los demás no la ven.`, cap(r.t, face(r.tc))];
+    case 3: {
+      const f = cap('Tu mano', face(r.rest)) + cap(r.t, face(r.tc));
+      return r.rest > r.tc ? ['¡Ganas la comparación!', `${r.t} tenía ${C[r.tc].n}, más baja que tu ${C[r.rest].n}. Queda fuera.`, f]
+        : r.rest < r.tc ? ['Pierdes la comparación.', `Tu ${C[r.rest].n} es más baja que ${C[r.tc].n}. Quedas fuera de la ronda.`, f]
+        : ['Empate.', 'Las dos manos valen lo mismo y nadie queda fuera.', f];
+    }
+    case 4: return ['Protección activa.', 'Hasta tu próximo turno nadie puede elegirte con una carta.', ''];
+    case 5:
+      if (r.t === 'Tú') return r.rest === 9 ? ['Te elegiste.', 'Descartas la Princesa y quedas fuera de la ronda.', cap('Descartada', face(9))]
+        : ['Descartas y robas.', `Descartas ${C[r.rest].n} y robas una carta nueva. Solo tú ves la nueva.`, cap('Descartada', face(r.rest)) + cap('Nueva', face(r.drew))];
+      return r.tc === 9 ? ['La Princesa cae.', `${r.t} descarta la Princesa y queda fuera.`, cap('Descartada', face(9))]
+        : ['Descarte forzado.', `${r.t} descarta ${C[r.tc].n} y roba una carta nueva del mazo.`, cap('Descartada', face(r.tc))];
+    case 6: { const k = r.opts[r.keep], [a, b] = r.order; return ['Carta conservada.', `Conservas ${C[k].n}. Al fondo del mazo van ${C[a].n} (primera) y ${C[b].n} (última, al fondo del todo).`, cap('Tu mano', face(k)) + cap('Al fondo: primera', face(a)) + cap('Al fondo: última', face(b))]; }
+    case 7: return ['Manos intercambiadas.', `Entregas ${C[r.rest].n} y recibes ${C[r.tc].n} de ${r.t}.`, cap('Entregas', face(r.rest)) + cap('Recibes', face(r.tc))];
+    case 8: return ['Condesa descartada.', 'No tiene efecto. Jugarla sin necesidad hace creer a los demás que tienes Rey o Príncipe.', ''];
+    default: return ['Quedas fuera.', 'Descartaste la Princesa. Revelas tu otra carta y sales de la ronda.', cap('Tu otra carta', face(r.rest))];
+  }
+}
+const trivial = () => S.res.none || [0, 4, 8].includes(S.played);
+const isPriv = () => { const r = S.res, v = S.played; return !r.none && (v === 2 || v === 3 || v === 6 || v === 7 || (v === 5 && r.t === 'Tú' && r.rest !== 9)); };
+const nextP = () => S.players.slice(1).find(p => !p.out) || S.players[1];
+const SUB = { 1: 'Acusarlo de tener una carta', 2: 'Ver su mano', 3: 'Comparar manos', 5: 'Descarta su mano y roba', 7: 'Intercambiar manos' };
+// Componente único de ventana: foco al abrir, cierre con × / fuera / Escape, retorno de foco en paint().
+const sheet = (label, h, sub, body, foot = '', cls = '') => `<div class="veil" data-close><div class="sheet${cls}" role="dialog" aria-modal="true" aria-label="${label}" tabindex="-1"><div class="sh-hd"><div><h3>${h}</h3>${sub ? `<span class="lbl">${sub}</span>` : ''}</div><button type="button" class="x" data-close aria-label="Cerrar">×</button></div>${body}${foot ? `<div class="row2">${foot}</div>` : ''}</div></div>`;
+function seat(p, pos) {
+  const turnOf = S.step === 4 && nextP().name === p.name;
+  const info = [p.out && gen(p, 'eliminado'), p.prot && gen(p, 'protegido'), p.spy && 'espía jugado', turnOf && 'es su turno'].filter(Boolean).join(', ');
+  const label = `${p.name}${info ? ', ' + info : ''}. ${p.out ? 'Sin cartas' : '1 carta en mano'}. Descartes: ${p.pile.map(v => C[v].n).join(', ') || 'ninguno'}. ${p.tokens} de ${S.toWin} fichas. Ver descartes`;
+  const mark = S.step >= 3 && S.res.t === p.name ? (S.res.tOut ? ' hit' : ' miss') : '';
+  return `<div class="seat ${pos}${p.out ? ' out' : ''}${turnOf ? ' turnof' : ''}${mark}" data-view="${p.name}" aria-label="${label}" role="button" tabindex="0"><div class="hd"><b>${p.name}</b>${chipsOf(p)}${turnOf ? '<i class="chip on">Su turno</i>' : ''}</div>
+    <div class="backs">${p.out ? '' : back}</div>
+    <div><div class="lbl">Descartes · ver detalle</div><div class="fan">${p.pile.map(mini).join('')}</div></div>
+    <div class="hearts">${hearts(p.tokens)}</div></div>`;
+}
+function mesa() {
+  const opp = S.players.slice(1);
+  const few = opp.length <= 1;
+  const left = few ? '' : seat(opp[0], 'left');
+  const right = few ? '' : seat(opp[opp.length - 1], 'right');
+  const topList = few ? opp : opp.slice(1, -1);
+  const me = by('Tú');
+  const nxt = S.step === 4 ? nextP() : null;
+  const turn = S.confirm ? 'Confirma tu jugada' : S.step === 1 ? (S.played === 1 ? 'Elige jugador y carta' : 'Elige un jugador') : S.step === 2 ? 'Elige qué carta conservar' : S.step === 3 ? 'Resultado de tu jugada' : nxt ? `Turno de ${nxt.name}: esperando su jugada` : 'Es tu turno';
+  const res = S.step === 3 ? describe() : null;
+  S.live = res ? `${res[0]} ${res[1]}` : turn;
+  const mod = modal();
+  const inert = mod ? ' inert' : '';
+  const toast = res && trivial() ? `<div class="toast" role="group" aria-label="Resultado de la jugada"><p><b>${res[0]}</b> ${res[1]}</p><button type="button" class="ghost" data-next>Continuar</button></div>` : '';
+  const mine = `Tus descartes: ${me.pile.map(v => C[v].n).join(', ') || 'ninguno'}. ${me.tokens} de ${S.toWin} fichas. Ver descartes`;
+  const under = S.step === 0 ? action() : nxt ? `<div class="act wait"><span class="hint">Esperando a ${nxt.name}… No puedes jugar hasta tu turno.</span><button type="button" class="play" data-reset>Volver a tu turno</button></div>` : '';
+  return `<section class="board s-mesa" aria-label="Tablero Mesa Real"><div class="mainCol"${inert}><div class="table${few ? ' few' : ''}${!few && opp.length === 2 ? ' notop' : ''}">
+    ${topList.length ? `<div class="topRow">${topList.map(p => seat(p, '')).join('')}</div>` : ''}${left}${right}
+    <div class="center">
+      <div class="pile"><div class="slot"><div class="stack" role="img" aria-label="Mazo: ${S.deck} cartas">${back}${back}${back}<em>${S.deck}</em></div></div><span class="lbl">Mazo</span></div>
+      <div class="turn${S.step < 3 ? ' mine' : ''}">Ronda ${S.round}<small>${turn} · meta ${S.toWin} fichas</small><small class="net" aria-hidden="true">● en línea · ⏱ 0:42 · ejemplo</small></div>
+      <div class="pile"><div class="slot"><div class="fan">${back}${S.faceUp.map(mini).join('')}</div></div><span class="lbl">${S.faceUp.length ? 'Apartadas' : 'Apartada'}</span></div>
+    </div>
+    <div class="me"><span class="lbl priv">Tu mano · solo tú la ves</span><div class="hand${S.step >= 3 ? ' wait' : ''}">${S.hand.length ? S.hand.map(card).join('') : '<span class="lbl">Sin cartas: quedaste fuera de la ronda</span>'}</div>${under}
+      <div class="hd mine${me.out ? ' out' : ''}" data-view="Tú" aria-label="${mine}" role="button" tabindex="0" style="gap:18px"><span class="lbl">Tus descartes · ver detalle</span><span class="fan">${me.pile.map(mini).join('')}</span><span class="hearts">${hearts(me.tokens)}</span>${chipsOf(me)}${S.step < 3 && !me.out ? '<i class="chip on">Tu turno</i>' : ''}</div></div>
+  </div><h4 class="lbl logh" id="log-h">Registro de jugadas</h4><ol class="log" aria-labelledby="log-h">${S.log.map(t => `<li>${t}</li>`).join('')}</ol></div>${guide(inert)}${mod}${toast}</section>`;
+}
+const guide = inert => `<div class="guide" data-guide role="button" tabindex="0" aria-label="Carta guía: ampliar"${inert}><h4>Carta guía</h4><ol>${Object.entries(C).map(([v, c]) => `<li><b>${v}</b><span class="n">${c.n}</span><span class="q">×${c.q}</span><small>${c.sh}</small></li>`).join('')}</ol><span class="zoom">Toca para ampliar</span></div>`;
+const tile = (p, v, rest) => {
+  const ok = eligible(p, v);
+  const sub = p.me ? `Descartas ${C[rest].n} y robas` : ok ? SUB[v] : gen(p, p.out ? 'Eliminado' : 'Protegido');
+  const inner = `<b>${p.name}${p.me ? ' (tú)' : ''}</b><span class="lbl">${sub}</span><span class="fan">${p.pile.map(mini).join('')}</span><span class="hearts">${hearts(p.tokens)}</span>`;
+  return ok ? `<button type="button" class="ptile" ${v === 1 ? `data-tsel="${p.name}" aria-pressed="${S.target === p.name}"` : `data-target="${p.name}"`}>${inner}</button>` : `<button type="button" class="ptile off" aria-disabled="true">${inner}</button>`;
+};
+function pickModal() {
+  const v = S.played, rest = other();
+  const tiles = S.players.filter(p => v === 5 || !p.me).map(p => tile(p, v, rest)).join('');
+  const extra = v === 5 ? ' Puedes elegirte. Si el elegido descarta la Princesa, queda fuera.' : '';
+  return sheet(`Elegir jugador: ${C[v].n}`, `${C[v].n}: ${PROMPT[v]}`, `Protegidos y eliminados no se pueden elegir.${extra}`, `<div class="ptiles">${tiles}</div>`, '<button type="button" class="ghost" data-cancel>Cancelar</button>');
+}
+function guardModal() {
+  const tiles = S.players.filter(p => !p.me).map(p => tile(p, 1)).join('');
+  const ready = S.target && S.gsel != null;
+  const gs = GUESS.map(g => `<button type="button" class="gbtn" data-gsel="${g}" aria-pressed="${S.gsel === g}"${S.target ? '' : ' disabled'}><b>${g}</b><span>${C[g].n}</span></button>`).join('');
+  return sheet('Guardia: acusar a un jugador', 'Guardia: elige jugador y carta', 'Protegidos y eliminados no se pueden elegir. No puedes nombrar Guardia. Si aciertas, queda fuera; si fallas, nadie ve su carta.',
+    `<div class="ptiles">${tiles}</div><span class="lbl">${S.target ? `¿Qué carta crees que tiene ${S.target}?` : 'Primero elige un jugador'}</span><div class="guess">${gs}</div>`,
+    `<button type="button" class="ghost" data-cancel>Cancelar</button><button type="button" class="play" data-accuse${ready ? '' : ' disabled'}>${ready ? `Acusar a ${S.target}: ${C[S.gsel].n}` : 'Acusar'}</button>`);
+}
+function guideModal() {
+  const rows = Object.entries(C).map(([v, c]) => `<li><span class="gv">${v}</span><span class="gi">${ico(v)}</span><div><b>${c.n}</b> <i>×${c.q}</i><p>${c.fx}</p></div></li>`).join('');
+  return sheet('Carta guía', 'Carta guía', '21 cartas · en tu turno robas 1 y juegas 1', `<ol class="glist">${rows}</ol>
+    <div class="gnote"><div class="bagrow"><img class="bag" src="assets/bag.png" alt="" width="72" height="54" loading="lazy" decoding="async" onerror="this.remove()"><p><b>Fichas para ganar.</b> 2 jugadores: 6 · 3 jugadores: 5 · 4 jugadores: 4 · 5 o 6 jugadores: 3. Ahora: ${S.n} jugadores, ${S.toWin} fichas.</p></div>
+    <p><b>Fin de ronda.</b> Cuando queda un solo jugador o se acaba el mazo. Gana la mano más alta; si empatan, la mayor suma de descartes. Si solo un jugador que sigue en juego jugó un Espía, gana 1 ficha extra.</p>
+    <p><b>Preparación.</b> Se aparta 1 carta boca abajo; con 2 jugadores, además 3 boca arriba.</p></div>`, '', ' wide');
+}
+function keepModal() {
+  const r = S.res, priv = '<i class="chip">Privado · solo tú lo ves</i>';
+  if (r.keep == null) return sheet('Canciller: elegir carta', 'Canciller: ¿qué carta conservas?', `${priv} Luego ordenas las otras dos para el fondo del mazo.`,
+    `<div class="faces">${r.opts.map((o, i) => cap(i === 0 ? 'Tu mano' : 'Robada', big(o, ' opt', `data-keep="${i}" aria-label="Conservar ${C[o].n}"`, 'button'))).join('')}</div>`,
+    '<button type="button" class="ghost" data-cancel>Cancelar</button>');
+  const rows = r.order.map((o, i) => `<div class="dwrap">${big(o)}<span class="lbl">${i === 0 ? 'Primera al fondo' : 'Última (al fondo del todo)'}</span><button type="button" class="ghost" data-swap="${i}" aria-label="${i === 0 ? 'Bajar' : 'Subir'} ${C[o].n}">${i === 0 ? '▼ Bajar' : '▲ Subir'}</button></div>`).join('');
+  return sheet('Canciller: ordenar el fondo del mazo', 'Canciller: ordena el fondo del mazo', `${priv} Conservas ${C[r.opts[r.keep]].n}. Elige el orden en que las otras dos van al fondo.`, `<div class="faces">${rows}</div>`,
+    '<button type="button" class="ghost" data-unkeep>Cambiar carta</button><button type="button" class="play" data-ok>Confirmar orden</button>');
+}
+function confirmModal() {
+  return sheet('Confirmar jugar la Princesa', '¿Jugar la Princesa?', 'Esta acción no se puede deshacer.', '<p class="rtxt">Si la descartas, quedas fuera de la ronda.</p>',
+    '<button type="button" class="ghost" data-cancel>Cancelar</button><button type="button" class="play" data-confirm>Sí, jugarla y salir</button>', ' warn');
+}
+function resultModal() {
+  const [head, body, faces] = describe();
+  const tag = isPriv() ? '<i class="chip">Privado · solo tú lo ves</i>' : '<i class="chip">Público · todos lo ven</i>';
+  return sheet(`Resultado: ${C[S.played].n}`, head, tag, `<p class="rtxt">${body}</p>${faces ? `<div class="faces">${faces}</div>` : ''}`, '<button type="button" class="play" data-next>Continuar</button>', S.res.tOut ? ' hit' : '');
+}
+// Ventana de la jugada en curso. Los resultados triviales usan aviso, no ventana.
+function fm() {
+  if (S.confirm) return confirmModal();
+  if (S.step === 1) return S.played === 1 ? guardModal() : pickModal();
+  if (S.step === 2) return keepModal();
+  if (S.step === 3 && !trivial()) return resultModal();
+  return '';
+}
+function modal() {
+  const f = fm();
+  if (f) return f;
+  if (S.guide) return guideModal();
+  const p = S.view && by(S.view);
+  if (!p) return '';
+  const last = p.pile.length - 1;
+  const capt = i => i === last ? (p.out ? `Con esta quedó ${gen(p, 'eliminado')}` : 'Más reciente') : `Jugada ${i + 1}`;
+  const notes = [p.out && gen(p, 'Eliminado'), p.prot && `${gen(p, 'Protegido')} hasta su próximo turno`, p.spy && 'Jugó un Espía'].filter(Boolean).join(' · ');
+  const cards = p.pile.map((v, i) => `<div class="dwrap"><div class="card c${v}${artCls(v)} static">${artImg(v)}<span class="val">${v}</span><span class="ico">${ico(v)}</span><span class="nm">${C[v].n}</span><span class="fx">${C[v].sh}</span></div><span class="cfx">${C[v].fx}</span><span class="lbl">${capt(i)}</span></div>`).join('');
+  return sheet(`Descartes de ${p.name}`, `Descartes de ${p.name}`, `${p.pile.length} ${p.pile.length === 1 ? 'carta' : 'cartas'} · de la más antigua a la más reciente${notes ? ' · ' + notes : ''}`, `<div class="dgrid">${cards}</div>`);
+}
+function reset() { S.step = 0; S.target = null; S.gsel = null; S.res = null; S.played = null; S.confirm = false; }
+const dismiss = () => { if (S.step === 3) S.step = 4; else reset(); };
+// Después de repintar: devuelve el foco a lo que lo tenía; al abrir una ventana lo lleva a ella y al cerrar vuelve a quien la abrió.
+function fkey(el) {
+  if (!el || !el.attributes || !el.closest || !el.closest('#stage, #count, #cardsel')) return null;
+  if (el.classList.contains('x')) return '.x';
+  for (const a of el.attributes) if (a.name.startsWith('data-')) return `[${a.name}="${a.value}"]`;
+  return el.classList.contains('play') ? '.act .play' : null;
+}
+function paint() {
+  sync();
+  const lock = S.step > 0 || S.confirm;
+  const btn = (attr, val, on, txt) => `<button type="button" ${attr}="${val}" aria-pressed="${on}"${lock ? ' disabled' : ''}>${txt}</button>`;
+  const key = fkey(document.activeElement), hadVeil = !!document.querySelector('.veil');
+  document.getElementById('count').innerHTML = '<span>Jugadores</span>' + [2, 3, 4, 5, 6].map(n => btn('data-n', n, n === S.n, n)).join('') +
+    `<span class="info">Meta: ${S.toWin} fichas de afecto · se aparta ${S.n === 2 ? '1 carta boca abajo y 3 boca arriba' : '1 carta boca abajo'}</span>`;
+  document.getElementById('cardsel').innerHTML = '<span>Carta que juegas</span>' + Object.keys(C).map(v => btn('data-scn', v, +v === S.scn, `${v} ${C[v].n}`)).join('') +
+    (lock ? '<span class="info">Termina la jugada («Continuar» o «Volver a tu turno») para cambiar la configuración.</span>' : '');
+  document.getElementById('stage').innerHTML = mesa();
+  const veil = document.querySelector('.veil');
+  ['count', 'cardsel'].forEach(id => document.getElementById(id).toggleAttribute('inert', !!veil));
+  const live = document.getElementById('live');
+  if (live.textContent !== S.live) live.textContent = S.live;
+  let t = null;
+  if (veil) {
+    if (!hadVeil) S.opener = key;
+    t = (hadVeil && key && veil.querySelector(key)) || veil.querySelector('.sheet');
+  } else if (key || hadVeil) {
+    t = (hadVeil && S.opener && document.querySelector(S.opener)) || (key && document.querySelector(key)) || document.querySelector('.toast [data-next]') || document.querySelector('.act [data-reset]') || document.querySelector('.act .play');
+  }
+  if (t) t.focus();
+}
+function play() {
+  const v = S.sel;
+  S.played = v;
+  S.target = null; S.gsel = null;
+  const rest = other();
+  if (TGT.includes(v)) {
+    if (S.players.some(p => eligible(p, v))) S.step = 1;
+    else { S.res = { none: true, rest }; S.step = 3; }
+  } else if (v === 6) { S.res = { rest, opts: [rest, ...CHANC] }; S.step = 2; }
+  else { S.res = { rest }; S.step = 3; }
+}
+function choose(name) {
+  const v = S.played, t = by(name), rest = other();
+  const r = { t: name, rest };
+  if (v === 5) { r.tc = t.me ? rest : t.card; r.drew = t.me ? DRAW_SELF : null; } else r.tc = t.card;
+  S.res = r; S.step = 3;
+}
+document.addEventListener('click', e => {
+  const T = e.target;
+  const cl = T.closest('[data-close]');
+  if (cl && (cl.classList.contains('x') || T === cl)) { if (fm()) dismiss(); else { S.view = null; S.guide = false; } return paint(); }
+  const tg = T.closest('[data-target]');
+  if (tg) { choose(tg.dataset.target); return paint(); }
+  const ts = T.closest('[data-tsel]');
+  if (ts) { S.target = ts.dataset.tsel; return paint(); }
+  const gl = T.closest('[data-gsel]');
+  if (gl && !gl.disabled) { S.gsel = +gl.dataset.gsel; return paint(); }
+  const ac = T.closest('[data-accuse]');
+  if (ac) {
+    if (ac.disabled) return;
+    const t = by(S.target), g = S.gsel;
+    S.res = { t: t.name, g, tc: t.card, hit: t.card === g, rest: other() };
+    S.step = 3; return paint();
+  }
+  const gd = T.closest('[data-guide]');
+  if (gd) { S.guide = true; return paint(); }
+  const vw = T.closest('[data-view]');
+  if (vw && !S.view) { S.view = vw.dataset.view; return paint(); }
+  if (T.closest('[data-confirm]')) { S.confirm = false; play(); return paint(); }
+  if (T.closest('[data-next]')) { S.step = 4; return paint(); }
+  if (T.closest('[data-cancel],[data-reset]')) { reset(); return paint(); }
+  const kp = T.closest('[data-keep]');
+  if (kp) { const k = +kp.dataset.keep; S.res.keep = k; S.res.order = S.res.opts.filter((_, j) => j !== k); return paint(); }
+  if (T.closest('[data-unkeep]')) { S.res.keep = null; return paint(); }
+  if (T.closest('[data-swap]')) { S.res.order.reverse(); return paint(); }
+  if (T.closest('[data-ok]')) { S.step = 3; return paint(); }
+  const n = T.closest('[data-n]');
+  if (n) { S.n = +n.dataset.n; reset(); return paint(); }
+  const sc = T.closest('[data-scn]');
+  if (sc) { S.scn = +sc.dataset.scn; S.sel = S.scn; reset(); return paint(); }
+  const c = T.closest('[data-pick]');
+  if (c) { S.sel = +c.dataset.pick; reset(); return paint(); }
+  const p = T.closest('.play');
+  if (p && !p.disabled) { if (S.sel === 9) S.confirm = true; else play(); paint(); }
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { if (fm()) dismiss(); else if (S.guide) S.guide = false; else if (S.view) S.view = null; else return; paint(); }
+  else if ((e.key === 'Enter' || e.key === ' ') && e.target.getAttribute && e.target.getAttribute('role') === 'button') { e.preventDefault(); e.target.click(); }
+});
+paint();
+</script>

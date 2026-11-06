@@ -1,0 +1,89 @@
+{
+  "edition": "Love Letter 2019 (Z-Man Games), 21 cartas con Espía y Canciller",
+  "players": { "min": 2, "max": 6 },
+  "tokensToWin": { "2": 6, "3": 5, "4": 4, "5": 3, "6": 3 },
+  "setup": {
+    "removedFaceDown": 1,
+    "removedFaceUpTwoPlayers": 3,
+    "handSize": 1,
+    "firstRoundStarter": "aleatorio",
+    "nextRoundStarter": "ganador de la ronda anterior"
+  },
+  "cards": [
+    {
+      "value": 0,
+      "id": "spy",
+      "name": "Espía",
+      "copies": 2,
+      "text": "Sin efecto al jugarla. Si al cerrar la ronda eres el único jugador aún en juego que jugó o descartó un Espía, ganas 1 ficha."
+    },
+    {
+      "value": 1,
+      "id": "guard",
+      "name": "Guardia",
+      "copies": 6,
+      "text": "Elige a otro jugador y nombra una carta (no Guardia). Si la tiene en la mano, queda fuera."
+    },
+    {
+      "value": 2,
+      "id": "priest",
+      "name": "Sacerdote",
+      "copies": 2,
+      "text": "Mira la mano de otro jugador."
+    },
+    {
+      "value": 3,
+      "id": "baron",
+      "name": "Barón",
+      "copies": 2,
+      "text": "Compara tu mano con la de otro jugador. Quien tenga el valor más bajo queda fuera. Si empatan, nadie."
+    },
+    {
+      "value": 4,
+      "id": "handmaid",
+      "name": "Doncella",
+      "copies": 2,
+      "text": "Hasta tu próximo turno, nadie puede elegirte con el efecto de una carta."
+    },
+    {
+      "value": 5,
+      "id": "prince",
+      "name": "Príncipe",
+      "copies": 2,
+      "text": "Elige a un jugador (puedes ser tú). Descarta su mano sin aplicar el efecto y roba una carta nueva. Si descarta la Princesa, queda fuera."
+    },
+    {
+      "value": 6,
+      "id": "chancellor",
+      "name": "Canciller",
+      "copies": 2,
+      "text": "Roba 2 cartas, conserva 1 y pon las otras 2 al fondo del mazo en el orden que quieras."
+    },
+    {
+      "value": 7,
+      "id": "king",
+      "name": "Rey",
+      "copies": 1,
+      "text": "Intercambia tu mano con la de otro jugador."
+    },
+    {
+      "value": 8,
+      "id": "countess",
+      "name": "Condesa",
+      "copies": 1,
+      "text": "Si tienes el Rey o el Príncipe en la mano, debes jugar la Condesa."
+    },
+    {
+      "value": 9,
+      "id": "princess",
+      "name": "Princesa",
+      "copies": 1,
+      "text": "Si la juegas o la descartas, quedas fuera."
+    }
+  ],
+  "roundEnd": [
+    "Solo queda un jugador sin eliminar: gana la ronda.",
+    "Al terminar un turno el mazo está vacío: gana la mano más alta; si empatan, la mayor suma de los valores de sus descartes; si persiste el empate, ganan todos los empatados."
+  ],
+  "spyBonus": "Al cerrar la ronda, si exactamente un jugador sigue en juego y jugó o descartó un Espía, gana 1 ficha extra."
+}

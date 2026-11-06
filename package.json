@@ -1,0 +1,22 @@
+{
+  "name": "loveletter",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "dev": "pnpm --parallel --filter @loveletter/server --filter @loveletter/web dev",
+    "build": "pnpm --filter @loveletter/web build",
+    "e2e": "pnpm --filter @loveletter/e2e test:e2e"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.15",
+    "typescript": "^7.0.2"
+  }
+}

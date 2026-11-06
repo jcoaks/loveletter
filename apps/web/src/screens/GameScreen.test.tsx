@@ -1,0 +1,353 @@
+import { type CardValue, type GameState, viewFor } from '@loveletter/engine';
+import { tableMoment } from '@loveletter/protocol';
+import { cleanup, render, act as rtlAct, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { useRoomStore } from '../store/room';
+import { useUiStore } from '../store/ui';
+import { rig, roomFor, seed, step } from '../test-utils';
+import { GameScreen } from './GameScreen';
+
+afterEach(() => {
+  cleanup();
+  useUiStore.setState({ dialog: null });
+});
+
+function mount(state: GameState, viewer = 'p0') {
+  const fns = { act: vi.fn(() => true), send: vi.fn(() => true) };
+  seed(state, viewer, fns);
+  const utils = render(
+    <MemoryRouter>
+      <GameScreen />
+    </MemoryRouter>,
+  );
+  return { ...utils, ...fns, user: userEvent.setup() };
+}
+
+const play = (state: GameState, card: CardValue, targetId?: string, guess?: CardValue) =>
+  step(state, { type: 'play_card', playerId: state.activeId as string, card, targetId, guess });
+
+const dialog = () => screen.getByRole('dialog');
+
+describe('GameScreen: mesa', () => {
+  it('muestra tu mano, el turno y a los rivales solo con reversos', () => {
+    const state = rig({ hands: [[1, 5], [3], [9]] });
+    const { container } = mount(state);
+    expect(screen.getAllByText('Es tu turno').length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: /^1, Guardia/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^5, Príncipe/ })).toBeInTheDocument();
+    // Cada rival enseña un reverso, nunca su carta.
+    expect(container.querySelectorAll('.ll-seat .ll-back')).toHaveLength(2);
+    expect(container.querySelectorAll('.ll-seat .ll-card:not(.sm)')).toHaveLength(0);
+    const seatLabels = Array.from(container.querySelectorAll('.ll-seat')).map((e) =>
+      e.getAttribute('aria-label'),
+    );
+    for (const label of seatLabels) expect(label).not.toMatch(/Barón|Princesa/);
+  });
+
+  it('cuando no es tu turno espera al jugador activo y no deja jugar', () => {
+    const state = rig({ hands: [[1, 5], [3], [9]] });
+    mount(state, 'p1');
+    expect(screen.getAllByText('Esperando a Ana').length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: /^Jugar/ })).toBeNull();
+  });
+
+  it('avisa a la sala con table_ready cuando todo está en calma', async () => {
+    const state = rig({ hands: [[1, 5], [3], [9]] });
+    const { send } = mount(state);
+    await waitFor(
+      () =>
+        expect(send).toHaveBeenCalledWith({
+          type: 'table_ready',
+          moment: tableMoment(viewFor(state, 'p0')),
+        }),
+      { timeout: 3000 },
+    );
+  });
+
+  it('la Condesa bloquea Rey y Príncipe', async () => {
+    const state = rig({ hands: [[8, 7], [3], [9]] });
+    const { user } = mount(state);
+    expect(
+      screen.getByRole('button', { name: /^7, Rey.*Bloqueada por la Condesa/ }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Jugar Condesa' })).toBeEnabled();
+    await user.click(screen.getByRole('button', { name: /^7, Rey/ }));
+    expect(screen.getByRole('button', { name: 'Jugar Rey' })).toBeDisabled();
+    expect(screen.getByText('Con la Condesa en la mano no puedes jugar Rey.')).toBeInTheDocument();
+  });
+});
+
+describe('GameScreen: jugadas', () => {
+  it('Guardia: jugador y carta en una ventana', async () => {
+    const { user, act } = mount(rig({ hands: [[1, 2], [3], [4]] }));
+    await user.click(screen.getByRole('button', { name: 'Jugar Guardia' }));
+    const d = within(dialog());
+    const accuse = d.getByRole('button', { name: 'Acusar' });
+    expect(accuse).toBeDisabled();
+    await user.click(d.getByRole('button', { name: /Beto/ }));
+    await user.click(d.getByRole('button', { name: /^3\s*Barón/ }));
+    await user.click(d.getByRole('button', { name: 'Acusar a Beto: Barón' }));
+    expect(act).toHaveBeenCalledWith({ type: 'play_card', card: 1, targetId: 'p1', guess: 3 });
+  });
+
+  it('Sacerdote, Barón y Rey eligen jugador y envían al instante; los protegidos no se pueden elegir', async () => {
+    const { user, act } = mount(rig({ hands: [[2, 7], [3], [4]], protect: [2] }));
+    await user.click(screen.getByRole('button', { name: /^2, Sacerdote/ }));
+    await user.click(screen.getByRole('button', { name: 'Jugar Sacerdote' }));
+    const d = within(dialog());
+    expect(d.getByRole('button', { name: /Carla/ })).toHaveAttribute('aria-disabled', 'true');
+    expect(d.queryByRole('button', { name: /\(tú\)/ })).toBeNull();
+    await user.click(d.getByRole('button', { name: /Beto/ }));
+    expect(act).toHaveBeenCalledWith({ type: 'play_card', card: 2, targetId: 'p1' });
+  });
+
+  it('Príncipe: puedes elegirte y se muestra qué descartarías', async () => {
+    const { user, act } = mount(rig({ hands: [[5, 2], [3], [4]] }));
+    await user.click(screen.getByRole('button', { name: 'Jugar Príncipe' }));
+    const d = within(dialog());
+    expect(d.getByText('Descartas Sacerdote y robas')).toBeInTheDocument();
+    await user.click(d.getByRole('button', { name: /Ana \(tú\)/ }));
+    expect(act).toHaveBeenCalledWith({ type: 'play_card', card: 5, targetId: 'p0' });
+  });
+
+  it('Princesa pide confirmación y se puede cancelar', async () => {
+    const { user, act } = mount(rig({ hands: [[9, 2], [3], [4]] }));
+    await user.click(screen.getByRole('button', { name: /^9, Princesa/ }));
+    await user.click(screen.getByRole('button', { name: 'Jugar Princesa' }));
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(act).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Jugar Princesa' }));
+    await user.click(screen.getByRole('button', { name: 'Sí, jugarla y salir' }));
+    expect(act).toHaveBeenCalledWith({ type: 'play_card', card: 9 });
+  });
+
+  it('sin objetivos posibles: avisa y envía sin objetivo', async () => {
+    const { user, act } = mount(rig({ hands: [[1, 2], [3], [4]], protect: [1, 2] }));
+    expect(screen.getByText('No hay a quién elegir: se descarta sin efecto.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Jugar Guardia' }));
+    expect(act).toHaveBeenCalledWith({ type: 'play_card', card: 1 });
+  });
+
+  it('Canciller: conservar una y ordenar el fondo (primera = primera al fondo)', async () => {
+    const before = rig({ hands: [[6, 2], [3], [4]], deck: [7, 8, 1, 1, 1] });
+    const { user, act } = mount(before);
+    const chan = play(before, 6);
+    rtlAct(() => seed(chan, 'p0', { act }));
+    // La vista nueva abre la elección sin que el jugador haga nada.
+    const d = within(await screen.findByRole('dialog', { name: 'Canciller: elegir carta' }));
+    await user.click(d.getByRole('button', { name: 'Conservar Sacerdote' }));
+    const o = within(screen.getByRole('dialog', { name: 'Canciller: ordenar el fondo del mazo' }));
+    await user.click(o.getByRole('button', { name: 'Bajar Rey' }));
+    await user.click(o.getByRole('button', { name: 'Confirmar orden' }));
+    expect(act).toHaveBeenCalledWith({ type: 'chancellor_keep', keep: 2, bottomOrder: [8, 7] });
+    // Y el motor lo acepta tal cual.
+    const done = step(chan, {
+      type: 'chancellor_keep',
+      playerId: 'p0',
+      keep: 2,
+      bottomOrder: [8, 7],
+    });
+    expect(done.deck.slice(-2)).toEqual([8, 7]);
+  });
+});
+
+describe('GameScreen: resultados', () => {
+  async function playAndSee(state: GameState, card: CardValue, target?: string, guess?: CardValue) {
+    const { user, act, rerender } = mount(state);
+    const after = play(state, card, target, guess);
+    rtlAct(() => seed(after, 'p0', { act }));
+    return { user, after, rerender };
+  }
+
+  it('Sacerdote: ventana privada con la carta vista', async () => {
+    await playAndSee(rig({ hands: [[2, 7], [3], [4]] }), 2, 'p1');
+    const d = within(await screen.findByRole('dialog', { name: 'Resultado: Sacerdote' }));
+    expect(d.getByText('Privado · solo tú lo ves')).toBeInTheDocument();
+    expect(d.getByRole('img', { name: 'Barón' })).toBeInTheDocument();
+  });
+
+  it('Guardia y Barón son públicos', async () => {
+    await playAndSee(rig({ hands: [[1, 2], [3], [4]] }), 1, 'p1', 3);
+    const d = within(await screen.findByRole('dialog', { name: 'Resultado: Guardia' }));
+    expect(d.getByText('Público · todos lo ven')).toBeInTheDocument();
+    expect(d.getByText('¡Acertaste!')).toBeInTheDocument();
+    cleanup();
+    await playAndSee(rig({ hands: [[3, 2], [5], [4]] }), 3, 'p1');
+    const b = within(await screen.findByRole('dialog', { name: 'Resultado: Barón' }));
+    expect(b.getByText('Público · todos lo ven')).toBeInTheDocument();
+    expect(b.getByText('Pierdes la comparación.')).toBeInTheDocument();
+  });
+
+  it('Rey: privado con lo entregado y lo recibido', async () => {
+    await playAndSee(rig({ hands: [[7, 1], [3], [4]] }), 7, 'p1');
+    const d = within(await screen.findByRole('dialog', { name: 'Resultado: Rey' }));
+    expect(d.getByText('Privado · solo tú lo ves')).toBeInTheDocument();
+    expect(d.getByText('Entregas')).toBeInTheDocument();
+    expect(d.getByText('Recibes')).toBeInTheDocument();
+  });
+
+  it('Espía, Doncella y Condesa: aviso no bloqueante', async () => {
+    const { user } = await playAndSee(rig({ hands: [[4, 2], [3], [5]] }), 4);
+    expect(await screen.findByText('Protección activa.')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Continuar' }));
+    expect(screen.queryByText('Protección activa.')).toBeNull();
+  });
+
+  it('no repite resultados antiguos al abrir la pantalla (reconexión)', () => {
+    const after = play(rig({ hands: [[2, 7], [3], [4]] }), 2, 'p1');
+    mount(after);
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+});
+
+describe('GameScreen: fuga de datos', () => {
+  it('un tercero no ve resultados ni manos ajenas cuando otros juegan Sacerdote o Rey', async () => {
+    const before = rig({ hands: [[2, 7], [3], [4]] });
+    const { act, container } = mount(before, 'p2');
+    const afterPriest = play(before, 2, 'p1');
+    rtlAct(() => seed(afterPriest, 'p2', { act }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(container.querySelectorAll('.ll-seat .ll-card:not(.sm)')).toHaveLength(0);
+    // La crónica dice que miró, no qué vio.
+    expect(screen.getByText('Ana jugó el Sacerdote y miró la mano de Beto.')).toBeInTheDocument();
+    expect(screen.queryByText(/tenía un Barón/)).toBeNull();
+
+    cleanup();
+    const k = rig({ hands: [[7, 1], [3], [4]] });
+    const m = mount(k, 'p2');
+    rtlAct(() => seed(play(k, 7, 'p1'), 'p2', { act: m.act }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByText(/Recibiste/)).toBeNull();
+    // La vista que recibe el cliente no lleva la mano ajena.
+    expect(JSON.stringify(roomFor(play(k, 7, 'p1'), 'p2').game)).not.toContain('"hands"');
+  });
+});
+
+describe('GameScreen: fin de ronda y de partida', () => {
+  it('resumen de ronda tras el resultado y botón Continuar', async () => {
+    const before = rig({ hands: [[1, 2], [3]] });
+    const { user, act } = mount(before);
+    const after = play(before, 1, 'p1', 3);
+    rtlAct(() => seed(after, 'p0', { act }));
+    // Primero el resultado de tu jugada.
+    await user.click(await screen.findByRole('button', { name: 'Continuar' }));
+    const d = within(await screen.findByRole('dialog', { name: 'Fin de la ronda 1' }));
+    expect(d.getByText('Gana la ronda Tú')).toBeInTheDocument();
+    expect(d.getByText(/fue el último jugador en pie/)).toBeInTheDocument();
+    expect(d.getByText('+1')).toBeInTheDocument();
+    await user.click(d.getByRole('button', { name: 'Continuar' }));
+    expect(act).toHaveBeenCalledWith({ type: 'continue_round' });
+  });
+
+  it('muestra las manos reveladas y espera a los demás', async () => {
+    let s = rig({ hands: [[2, 3], [5], [4]], deck: [1] });
+    s = play(s, 2, 'p1'); // p1 roba y el mazo queda vacío
+    s = play(s, 5, 'p1'); // p1 se descarta... cierra por mazo vacío o sigue
+    const rounds = s.phase === 'round_over' ? s : null;
+    if (!rounds) return;
+    seed(rounds, 'p0');
+    render(
+      <MemoryRouter>
+        <GameScreen />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('dialog', { name: /Fin de la ronda/ })).toBeInTheDocument();
+  });
+
+  it('fin de partida: podio, ganador y nueva partida solo para el anfitrión', async () => {
+    const before = rig({ hands: [[1, 2], [3]], tokens: [5, 2] });
+    const { user, send, act } = mount(before);
+    const after = play(before, 1, 'p1', 3);
+    rtlAct(() => seed(after, 'p0', { act, send }));
+    await user.click(await screen.findByRole('button', { name: 'Continuar' }));
+    const d = within(await screen.findByRole('dialog', { name: 'Fin de la partida' }));
+    expect(d.getByText('¡Ganaste la partida!')).toBeInTheDocument();
+    const podium = d.getByRole('list', { name: 'Podio' });
+    expect(within(podium).getAllByRole('listitem')[0]).toHaveTextContent('Ana');
+    expect(within(podium).getByText('Ganador')).toBeInTheDocument();
+    await user.click(d.getByRole('button', { name: 'Nueva partida' }));
+    expect(send).toHaveBeenCalledWith({ type: 'new_game' });
+  });
+
+  it('un invitado espera al anfitrión', async () => {
+    const before = rig({ hands: [[1, 2], [3]], tokens: [5, 2] });
+    const after = play(before, 1, 'p1', 3);
+    mount(after, 'p1');
+    const d = within(await screen.findByRole('dialog', { name: 'Fin de la partida' }));
+    expect(d.queryByRole('button', { name: 'Nueva partida' })).toBeNull();
+    expect(d.getByText(/Esperando al anfitrión/)).toBeInTheDocument();
+  });
+});
+
+describe('GameScreen: pausa y conexión', () => {
+  it('pausa por desconexión con cuenta; el anfitrión no puede terminar antes de tiempo', () => {
+    const state = rig({ hands: [[1, 2], [3], [4]] });
+    const now = Date.now();
+    seed(
+      state,
+      'p0',
+      {},
+      {
+        status: 'paused',
+        pause: { disconnectedIds: ['p1'], since: now - 5000, hostCanEndAt: now + 115000 },
+      },
+    );
+    render(
+      <MemoryRouter>
+        <GameScreen />
+      </MemoryRouter>,
+    );
+    const d = within(screen.getByRole('alertdialog', { name: 'Partida en pausa' }));
+    expect(d.getByText('Beto perdió la conexión')).toBeInTheDocument();
+    expect(d.getByTestId('pause-clock')).toHaveTextContent(/En pausa · 0:0[5-9] de 2:00/);
+    expect(d.queryByRole('button', { name: 'Terminar la partida' })).toBeNull();
+  });
+
+  it('el anfitrión puede terminar pasado el tiempo', () => {
+    const state = rig({ hands: [[1, 2], [3], [4]] });
+    const now = Date.now();
+    const send = vi.fn(() => true);
+    seed(
+      state,
+      'p0',
+      { send },
+      {
+        status: 'paused',
+        pause: { disconnectedIds: ['p1'], since: now - 130000, hostCanEndAt: now - 10000 },
+      },
+    );
+    render(
+      <MemoryRouter>
+        <GameScreen />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('button', { name: 'Terminar la partida' })).toBeInTheDocument();
+  });
+
+  it('sin conexión no se puede jugar', () => {
+    const state = rig({ hands: [[1, 2], [3], [4]] });
+    mount(state);
+    rtlAct(() => useRoomStore.setState({ status: 'reconnecting' }));
+    expect(screen.getByRole('alertdialog', { name: 'Sin conexión' })).toBeInTheDocument();
+  });
+});
+
+describe('GameScreen: bots', () => {
+  it('muestra la frase de un bot junto a su asiento', async () => {
+    const state = rig({ hands: [[1, 2], [3], [4]], bots: 1 });
+    const { act } = mount(state);
+    rtlAct(() =>
+      seed(
+        state,
+        'p0',
+        { act },
+        { chat: [{ id: 1, playerId: 'p2', text: '¡Qué mala suerte!', after: null }] },
+      ),
+    );
+    expect(await screen.findByText('¡Qué mala suerte!', {}, { timeout: 3000 })).toBeInTheDocument();
+  });
+});

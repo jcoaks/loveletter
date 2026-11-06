@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+.wrangler/
+.dev.vars
+.env*
+!.env.example
+*.log
+.DS_Store
+test-results/
+playwright-report/
+
+# Originales del arte (pesados); la app usa los WebP generados con scripts/optimize-assets.py.
+assets-src/
