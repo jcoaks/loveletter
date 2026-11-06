@@ -1,8 +1,7 @@
-import { CARD_VALUES, type CardValue, type LegalPlay } from '@loveletter/engine';
+import type { CardValue, LegalPlay } from '@loveletter/engine';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChancellorModal } from '../components/ChancellorModal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-import { CountsBox } from '../components/CountsBox';
 import { DiscardsModal } from '../components/DiscardsModal';
 import { GuardModal } from '../components/GuessPicker';
 import { GuideModal } from '../components/GuideModal';
@@ -22,7 +21,6 @@ import { useBotSpeech } from '../hooks/useBotSpeech';
 import { useTableReady } from '../hooks/useTableReady';
 import { CARD_BY_VALUE, cardName } from '../lib/cards';
 import { chronicle, type TextContext } from '../lib/chronicle';
-import { cardCounts } from '../lib/counts';
 import { buildResults, type ChancellorPick, type TableResult } from '../lib/results';
 import { pickerPlayers, seatsOf } from '../lib/seats';
 import type { NoticeMode } from '../lib/session';
@@ -122,12 +120,6 @@ export function GameScreen() {
     [game.you.id, game.players],
   );
   const seats = useMemo(() => seatsOf(game, room), [game, room]);
-  const counts = useMemo(() => cardCounts(game), [game]);
-  const leftMap = useMemo(
-    () =>
-      Object.fromEntries(CARD_VALUES.map((v) => [v, counts[v].left])) as Record<CardValue, number>,
-    [counts],
-  );
   const results = useResults(ctx, noticeMode);
   const current = results.queue[0];
 
@@ -365,7 +357,6 @@ export function GameScreen() {
           speech={speech.speech}
           onOpenSeat={setSeatInfo}
           onOpenGuide={() => openDialog('guide')}
-          guideCounts={counts}
           actions={actions}
           mine={
             <>
@@ -430,9 +421,7 @@ export function GameScreen() {
           restCard={lp.card === 5 ? restCard : undefined}
           onPick={(id) => submit(lp.card, id)}
           onCancel={() => setFlow(null)}
-        >
-          <CountsBox counts={counts} discards={seats.me.discards} hand={hand} />
-        </PlayerPickerModal>
+        />
       )}
       {flow === 'guard' && lp && (
         <GuardModal
@@ -444,15 +433,6 @@ export function GameScreen() {
           onGuess={setGuess}
           onAccuse={() => target && guess !== null && submit(1, target, guess)}
           onCancel={() => setFlow(null)}
-          left={leftMap}
-          info={
-            <CountsBox
-              counts={counts}
-              discards={seats.me.discards}
-              hand={hand}
-              showCounts={false}
-            />
-          }
         />
       )}
       {flow === 'confirm' && (
@@ -489,9 +469,7 @@ export function GameScreen() {
           onClose={() => setSeatInfo(null)}
         />
       )}
-      {dialog === 'guide' && (
-        <GuideModal players={game.players.length} counts={counts} onClose={closeDialog} />
-      )}
+      {dialog === 'guide' && <GuideModal players={game.players.length} onClose={closeDialog} />}
 
       {showEnd && game.phase === 'round_over' && (
         <RoundOverModal

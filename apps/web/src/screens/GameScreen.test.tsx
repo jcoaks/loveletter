@@ -352,7 +352,15 @@ describe('GameScreen: bots', () => {
         { chat: [{ id: 1, playerId: 'p2', text: '¡Qué mala suerte!', after: null }] },
       ),
     );
-    expect(await screen.findByText('¡Qué mala suerte!', {}, { timeout: 3000 })).toBeInTheDocument();
+    const text = await screen.findByText('¡Qué mala suerte!', {}, { timeout: 3000 });
+    const bubble = text.closest('.ll-bubble');
+    expect(bubble).toHaveAttribute('aria-live', 'polite');
+    expect(bubble).toHaveTextContent('Carla dice:');
+    // Está dentro del asiento del bot que habla.
+    expect(bubble?.closest('.ll-seat')).toHaveAttribute(
+      'aria-label',
+      expect.stringContaining('Carla'),
+    );
   });
 });
 
@@ -660,59 +668,16 @@ describe('GameScreen: avisos inferiores (toasts)', () => {
   });
 });
 
-describe('GameScreen: cuentas de cartas', () => {
-  it('el Guardia muestra "quedan N" en cada carta y tus descartes y mano en el propio modal', async () => {
-    const state = rig({
-      hands: [[1, 3], [2], [4]],
-      discards: { 0: [5], 1: [1, 1], 2: [1] },
-    });
-    const { user } = mount(state);
-    await user.click(screen.getByRole('button', { name: 'Jugar Guardia' }));
-    const d = within(dialog());
-    // Barón: 2 copias, 1 en tu mano -> quedan 1. Príncipe: 2 copias, 1 descartada -> quedan 1.
-    expect(d.getByRole('button', { name: /^3\s*Barón\s*quedan 1/ })).toBeInTheDocument();
-    expect(d.getByRole('button', { name: /^5\s*Príncipe\s*quedan 1/ })).toBeInTheDocument();
-    expect(d.getByRole('button', { name: /^7\s*Rey\s*quedan 1/ })).toBeInTheDocument();
-    expect(d.getByText('Cuentas: tus descartes y tu mano')).toBeInTheDocument();
-    expect(d.getByText('Tus descartes')).toBeInTheDocument();
-    expect(d.getByText('Tu mano')).toBeInTheDocument();
-  });
-
-  it('con 0 por aparecer se atenúa pero se puede nombrar, con una nota', async () => {
-    const state = rig({ hands: [[1, 2], [3], [4]], discards: { 1: [5, 5] } });
-    const { user, act } = mount(state);
-    await user.click(screen.getByRole('button', { name: 'Jugar Guardia' }));
-    const d = within(dialog());
-    await user.click(d.getByRole('button', { name: /Beto/ }));
-    const prince = d.getByRole('button', { name: /^5\s*Príncipe\s*quedan 0/ });
-    expect(prince).toHaveClass('zero');
-    expect(prince).toBeEnabled();
-    await user.click(prince);
-    expect(d.getByText(/Ya están a la vista todas las copias de Príncipe/)).toBeInTheDocument();
-    await user.click(d.getByRole('button', { name: 'Acusar a Beto: Príncipe' }));
-    expect(act).toHaveBeenCalledWith({ type: 'play_card', card: 1, targetId: 'p1', guess: 5 });
-  });
-
-  it('Barón, Príncipe, Rey y Sacerdote llevan el recuadro con una fila por carta', async () => {
-    const state = rig({ hands: [[3, 2], [5], [4]], discards: { 1: [3] } });
-    const { user } = mount(state);
-    await user.click(screen.getByRole('button', { name: 'Jugar Barón' }));
-    const d = within(dialog());
-    const list = d.getByRole('list', { name: 'Cartas que quedan por aparecer' });
-    expect(within(list).getAllByRole('listitem')).toHaveLength(10);
-    // Barón: 2 copias, 1 en tu mano y 1 descartada -> 0.
-    expect(within(list).getByText(/Barón/).closest('li')).toHaveClass('zero');
-    expect(within(list).getByText('quedan 6 de 6')).toBeInTheDocument();
-  });
-
-  it('la carta guía de la mesa y la ampliada llevan los contadores', async () => {
+describe('GameScreen: carta guía', () => {
+  it('la carta guía solo muestra las copias totales, sin "quedan"', async () => {
     const state = rig({ hands: [[3, 2], [5], [4]], discards: { 1: [3] } });
     const { user } = mount(state);
     const panel = screen.getByRole('button', { name: 'Carta guía: ampliar' });
-    expect(within(panel).getAllByText(/quedan/)).toHaveLength(10);
-    expect(within(panel).getByText('· quedan 0')).toHaveClass('zero');
+    expect(within(panel).queryByText(/quedan/)).toBeNull();
+    expect(within(panel).getByText('×6')).toBeInTheDocument();
     await user.click(panel);
     const g = within(screen.getByRole('dialog', { name: 'Carta guía' }));
-    expect(g.getByText(/a la vista 2 · quedan 0/)).toBeInTheDocument();
+    expect(g.queryByText(/quedan|a la vista/)).toBeNull();
+    expect(g.getAllByText(/^×\d$/).length).toBe(10);
   });
 });

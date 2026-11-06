@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react';
 import type { CardValue } from '../lib/cards';
-import type { CardCounts } from '../lib/counts';
 import type { SeatData } from '../lib/seat';
 import { CardBack, CardFan } from './Card';
 import { GuidePanel } from './GuidePanel';
@@ -50,7 +49,6 @@ export function TableLayout({
   onOpenSeat,
   onOpenGuide,
   speech,
-  guideCounts,
   children,
 }: {
   rivals: readonly SeatData[];
@@ -71,8 +69,6 @@ export function TableLayout({
   onOpenGuide?: () => void;
   /** Frases de bots en pantalla, por id de jugador. */
   speech?: Record<string, string>;
-  /** Copias por aparecer de cada carta, para la carta guía. */
-  guideCounts?: CardCounts;
   children?: ReactNode;
 }) {
   const aside = setAside.hidden + setAside.faceUp.length;
@@ -123,7 +119,7 @@ export function TableLayout({
         {actions && <div className="ll-actbar">{actions}</div>}
         {log && <LogPanel entries={log} />}
       </div>
-      {onOpenGuide && <GuidePanel onOpen={onOpenGuide} counts={guideCounts} />}
+      {onOpenGuide && <GuidePanel onOpen={onOpenGuide} />}
       {children}
     </section>
   );

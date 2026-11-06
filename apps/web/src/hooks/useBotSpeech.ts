@@ -1,7 +1,8 @@
 import type { ChatLine } from '@loveletter/protocol';
 import { useEffect, useRef, useState } from 'react';
 
-const SPEECH_MS = 5500;
+/** Un globo dura entre 4,5 y 9 s según lo largo que sea el texto. */
+const speechMs = (text: string) => Math.min(9000, Math.max(4500, 2500 + text.length * 55));
 const SPEECH_GAP_MS = 1100;
 const TOPIC_GAP_MS = 2200;
 const FIRST_REMARK_MS = 300;
@@ -75,7 +76,7 @@ export function useBotSpeech(
           if (showing.current.get(line.playerId)?.id !== line.id) return;
           showing.current.delete(line.playerId);
           publish();
-        }, SPEECH_MS);
+        }, speechMs(line.text));
         setQueued((n) => n + 1);
       },
       fresh ? FIRST_REMARK_MS : SPEECH_GAP_MS + (topicChange ? TOPIC_GAP_MS : 0),

@@ -30,7 +30,7 @@ export function SeatCard({
   const body = (
     <>
       {speech && (
-        <span className="ll-bubble" role="status">
+        <span className="ll-bubble" role="status" aria-live="polite">
           <span className="sr-only-ll">{seat.name} dice: </span>
           {speech}
         </span>

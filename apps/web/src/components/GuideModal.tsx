@@ -1,26 +1,13 @@
 import { BAG_ART, CARDS, TOKENS_TO_WIN } from '../lib/cards';
-import type { CardCounts } from '../lib/counts';
 import { CardIcon } from './icons';
 import { Sheet } from './Sheet';
 
-export function GuideModal({
-  players,
-  counts,
-  onClose,
-}: {
-  players?: number;
-  counts?: CardCounts;
-  onClose: () => void;
-}) {
+export function GuideModal({ players, onClose }: { players?: number; onClose: () => void }) {
   return (
     <Sheet
       label="Carta guía"
       title="Carta guía"
-      sub={
-        counts
-          ? 'Quedan = copias que no ves: descartes de todos, tu mano y las boca arriba ya descontados'
-          : '21 cartas · en tu turno robas 1 y juegas 1'
-      }
+      sub="21 cartas · en tu turno robas 1 y juegas 1"
       onClose={onClose}
       wide
     >
@@ -33,12 +20,6 @@ export function GuideModal({
             </span>
             <div>
               <b>{c.name}</b> <i>×{c.copies}</i>
-              {counts && (
-                <i className={`lf ${counts[c.value].left === 0 ? 'zero' : 'some'}`}>
-                  {' '}
-                  · a la vista {counts[c.value].seen} · quedan {counts[c.value].left}
-                </i>
-              )}
               <p>{c.text}</p>
             </div>
           </li>
