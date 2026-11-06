@@ -234,19 +234,11 @@ export function GameScreen() {
   const chancellorView = game.phase === 'chancellor' ? game.chancellor : null;
   const showEnd = !current && !endHidden;
 
-  const marks = useMemo(() => {
-    const m: Record<string, 'hit' | 'miss'> = {};
-    const last = [...game.events]
-      .reverse()
-      .find((e) => e.type === 'eliminated' || e.type === 'guess');
-    if (last?.type === 'eliminated') m[last.playerId] = 'hit';
-    else if (last?.type === 'guess' && !last.correct) m[last.targetId] = 'miss';
-    return m;
-  }, [game.events]);
-
+  // Only the target of the notice being shown is highlighted, and only while it is open: a mark
+  // left over from an earlier play (or round) would read as a status the seat no longer has.
   const pickedId = current?.other?.targetId ?? null;
-  const allMarks =
-    pickedId && pickedId !== game.you.id ? { ...marks, [pickedId]: 'picked' as const } : marks;
+  const allMarks: Record<string, 'hit' | 'picked'> =
+    pickedId && pickedId !== game.you.id ? { [pickedId]: current?.hit ? 'hit' : 'picked' } : {};
 
   const actions =
     myPlayTurn && lp ? (
