@@ -36,7 +36,7 @@ export function ResultModal({
   const rootRef = useRef<HTMLDivElement>(null);
   const reduced = useRef(prefersReducedMotion());
   const auto = autoCloseMs !== undefined;
-  const { elapsed, secondsLeft, pointer } = useCountdown({
+  const { elapsed, secondsLeft, paused, pointer } = useCountdown({
     ms: autoCloseMs ?? Number.POSITIVE_INFINITY,
     resetKey,
     onDone: onContinue,
@@ -88,7 +88,11 @@ export function ResultModal({
                 />
               </div>
             )}
-            <span className="ll-lbl">Se cierra en {secondsLeft} s</span>
+            <span className="ll-lbl" style={{ textTransform: 'none', letterSpacing: 0 }}>
+              {paused
+                ? 'En pausa · toca para seguir'
+                : `Se cierra en ${secondsLeft} s · toca para pausar`}
+            </span>
           </div>
         )}
       </div>

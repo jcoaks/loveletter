@@ -1,4 +1,5 @@
 import type { CardValue, PlayerView, RoundSummary } from '@loveletter/engine';
+import { useState } from 'react';
 import { Card } from '../../components/Card';
 import { Sheet } from '../../components/Sheet';
 import { Tokens } from '../../components/Token';
@@ -26,9 +27,18 @@ export function summaryTitle(game: PlayerView, summary: RoundSummary): string {
 /** La carta apartada: un dato discreto, en una línea; al pasar el cursor o enfocar se amplía. */
 function SetAsideNote({ value }: { value: CardValue }) {
   const label = `Carta apartada: ${cardName(value)}`;
+  // Con el cursor se amplía al pasar; en táctil, al tocar.
+  const [open, setOpen] = useState(false);
   return (
     <section aria-label="Carta apartada" className="ll-aside-row">
-      <button type="button" className="ll-aside" title="Ampliar">
+      <button
+        type="button"
+        className={`ll-aside${open ? ' open' : ''}`}
+        title="Ampliar"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        onBlur={() => setOpen(false)}
+      >
         <Card value={value} size="sm" ariaLabel={label} />
         <span className="ll-aside-pop" aria-hidden="true">
           <Card value={value} ariaLabel="" />

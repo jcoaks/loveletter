@@ -40,3 +40,37 @@ export const HeartIcon = ({ filled, className }: { filled?: boolean; className?:
     <path d={GLYPHS[9]} />
   </svg>
 );
+
+function ToolSvg({ d, className }: { d: string; className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={className}
+    >
+      <path d={d} />
+    </svg>
+  );
+}
+
+/** Íconos de la barra superior (libro, pergamino, tres puntos). */
+export const BookIcon = ({ className }: { className?: string }) => (
+  <ToolSvg
+    className={className}
+    d="M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2zM4 19a2 2 0 012-2h13M9 7h6"
+  />
+);
+export const ScrollIcon = ({ className }: { className?: string }) => (
+  <ToolSvg
+    className={className}
+    d="M7 3h10v14a3 3 0 003 3H8a3 3 0 01-3-3V6a3 3 0 012-3zM9 8h6M9 12h6"
+  />
+);
+export const MoreIcon = ({ className }: { className?: string }) => (
+  <ToolSvg className={className} d="M5 12h.01M12 12h.01M19 12h.01" />
+);

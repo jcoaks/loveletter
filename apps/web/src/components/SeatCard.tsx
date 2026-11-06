@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { type SeatData, seatChips, seatLabel } from '../lib/seat';
 import { CardBack, CardFan } from './Card';
 import { Tokens } from './Token';
@@ -29,12 +29,19 @@ export function SeatCard({
       <span className="ll-hd">
         <b>{seat.name}</b>
         {seatChips(seat).map((c) => (
-          <i key={c.label} className={`ll-chip${c.on ? ' on' : ''}`}>
+          <i key={c.label} className={`ll-chip ${c.kind}${c.on ? ' on' : ''}`}>
             {c.label}
           </i>
         ))}
       </span>
-      <span className="ll-seat-row">
+      <span
+        className="ll-seat-row"
+        style={
+          {
+            '--tot': Math.max(1, (seat.eliminated ? 0 : seat.handCount) + seat.discards.length),
+          } as CSSProperties
+        }
+      >
         <span className="ll-backs">
           {!seat.eliminated &&
             Array.from({ length: seat.handCount }, (_, i) => (
@@ -101,7 +108,7 @@ export function MineBar({
       {seatChips(seat)
         .filter((c) => !c.on)
         .map((c) => (
-          <i key={c.label} className="ll-chip">
+          <i key={c.label} className={`ll-chip ${c.kind}`}>
             {c.label}
           </i>
         ))}

@@ -57,6 +57,9 @@ function ToastView({ item, onDismiss }: { item: ToastItem; onDismiss: (key: stri
       aria-live={alert ? 'assertive' : 'polite'}
       onMouseEnter={pause(true)}
       onMouseLeave={pause(false)}
+      onPointerDown={(e) => e.pointerType !== 'mouse' && pause(true)()}
+      onPointerUp={(e) => e.pointerType !== 'mouse' && pause(false)()}
+      onPointerCancel={pause(false)}
       onFocus={pause(true)}
       onBlur={pause(false)}
     >

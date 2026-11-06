@@ -93,6 +93,47 @@ describe('Home', () => {
   });
 });
 
+describe('Portada', () => {
+  it('muestra los pasos, las diez cartas, las características y los créditos', () => {
+    renderHome();
+    expect(
+      screen.getByRole('heading', { name: 'Cómo se juega en 30 segundos' }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole('listitem').length).toBeGreaterThanOrEqual(20);
+    const cards = screen
+      .getAllByRole('button')
+      .filter((b) => /Ver grande$/.test(b.getAttribute('aria-label') ?? ''));
+    expect(cards).toHaveLength(10);
+    expect(
+      screen.getByRole('heading', { name: 'Todo lo que necesitas para jugar' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Seiji Kanai, publicado por AEG y Z-Man Games/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Leer las reglas completas' })).toHaveAttribute(
+      'href',
+      '/reglas',
+    );
+  });
+
+  it('una carta se amplía con su efecto y se puede recorrer', async () => {
+    const user = renderHome();
+    await user.click(screen.getByRole('button', { name: /^1, Guardia.*Ver grande$/ }));
+    const dialog = screen.getByRole('dialog', { name: /Guardia/ });
+    expect(within(dialog).getByText(/nombra una carta/)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: /Siguiente/ }));
+    expect(screen.getByRole('dialog', { name: /Sacerdote/ })).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('el logo es el título y la página no tiene dos campos de nombre', () => {
+    renderHome();
+    expect(
+      screen.getByRole('heading', { level: 1, name: /Love Letter en línea/ }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByLabelText('Tu nombre en la mesa')).toHaveLength(1);
+  });
+});
+
 describe('Unirse por enlace', () => {
   it('muestra la mesa y se conecta con el nombre', async () => {
     api.getRoomInfo.mockResolvedValue(info);
@@ -194,6 +235,23 @@ describe('Sala de espera', () => {
     expect(screen.queryByRole('button', { name: /Expulsar/ })).toBeNull();
     await user.click(screen.getByRole('button', { name: '¿Listo para jugar?' }));
     expect(send).toHaveBeenCalledWith({ type: 'set_ready', ready: true });
+  });
+
+  it('ofrece compartir con el menú del teléfono cuando existe', async () => {
+    const share = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, 'share', { value: share, configurable: true });
+    const { user } = setup(true);
+    await user.click(screen.getByRole('button', { name: 'Compartir invitación' }));
+    expect(share).toHaveBeenCalledWith(
+      expect.objectContaining({ url: expect.stringContaining('/sala/KX7-QM2') }),
+    );
+    Reflect.deleteProperty(navigator, 'share');
+  });
+
+  it('sin menú de compartir solo hay copiar', () => {
+    setup(true);
+    expect(screen.queryByRole('button', { name: 'Compartir invitación' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Copiar código' })).toBeInTheDocument();
   });
 
   it('copia el enlace', async () => {

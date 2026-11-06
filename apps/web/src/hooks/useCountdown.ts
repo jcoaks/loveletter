@@ -1,4 +1,4 @@
-import { type RefObject, useEffect, useRef, useState } from 'react';
+import { type PointerEvent, type RefObject, useEffect, useRef, useState } from 'react';
 
 const TICK_MS = 100;
 
@@ -28,6 +28,9 @@ export function useCountdown({
 }) {
   const [elapsed, setElapsed] = useState(0);
   const hover = useRef(false);
+  // En táctil no hay cursor: un toque sobre el aviso (fuera de los botones) pausa o reanuda.
+  const held = useRef(false);
+  const [paused, setPaused] = useState(false);
   const done = useRef(false);
   const finish = useRef(onDone);
   finish.current = onDone;
@@ -42,9 +45,11 @@ export function useCountdown({
   // biome-ignore lint/correctness/useExhaustiveDependencies: un aviso nuevo reinicia la cuenta
   useEffect(() => {
     done.current = false;
+    held.current = false;
+    setPaused(false);
     setElapsed(0);
     const timer = window.setInterval(() => {
-      if (hover.current || focusInside()) return;
+      if (hover.current || held.current || focusInside()) return;
       setElapsed((e) => e + TICK_MS);
     }, TICK_MS);
     return () => window.clearInterval(timer);
@@ -61,12 +66,19 @@ export function useCountdown({
   return {
     elapsed,
     secondsLeft: Math.max(0, Math.ceil((ms - elapsed) / 1000)),
+    paused,
     pointer: {
       onMouseEnter: () => {
         hover.current = true;
       },
       onMouseLeave: () => {
         hover.current = false;
+      },
+      onPointerUp: (e: PointerEvent) => {
+        if (e.pointerType === 'mouse') return;
+        if ((e.target as HTMLElement).closest('button')) return;
+        held.current = !held.current;
+        setPaused(held.current);
       },
     },
   };

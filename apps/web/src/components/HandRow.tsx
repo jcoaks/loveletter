@@ -25,7 +25,7 @@ export function HandRow({
   hideLast?: number;
 }) {
   return (
-    <div className={`ll-hand${waiting ? ' wait' : ''}`}>
+    <div className={`ll-hand${waiting ? ' wait' : ''}`} data-n={hand.length}>
       {hand.length === 0 ? (
         <span className="ll-lbl">{emptyText}</span>
       ) : (

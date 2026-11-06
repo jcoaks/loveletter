@@ -106,7 +106,7 @@ export function PlayerPickerModal({
               <button
                 key={p.id}
                 type="button"
-                className="ll-ptile"
+                className={`ll-ptile${p.isMe ? ' me' : ''}`}
                 aria-pressed={selectable ? selectedId === p.id : undefined}
                 onClick={() => onPick(p.id)}
               >

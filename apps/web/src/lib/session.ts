@@ -40,3 +40,15 @@ export const noticeModePref = {
   get: (): NoticeMode => (read('loveletter:notices') === 'brief' ? 'brief' : 'full'),
   set: (mode: NoticeMode) => write('loveletter:notices', mode === 'brief' ? 'brief' : null),
 };
+
+/** Vibración al llegar tu turno (solo teléfonos que la admiten): apagada por omisión. */
+export const hapticsPref = {
+  get: (): boolean => read('loveletter:haptics') === 'on',
+  set: (on: boolean) => write('loveletter:haptics', on ? 'on' : null),
+};
+
+/** Mantener la pantalla encendida durante la partida: encendida por omisión. */
+export const wakePref = {
+  get: (): boolean => read('loveletter:wake') !== 'off',
+  set: (on: boolean) => write('loveletter:wake', on ? null : 'off'),
+};

@@ -1,4 +1,4 @@
-import { type KeyboardEvent, type ReactNode, useEffect, useRef } from 'react';
+import { type KeyboardEvent, type PointerEvent, type ReactNode, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
 export interface SheetProps {
@@ -79,6 +79,30 @@ export function Sheet({
     };
   }, []);
 
+  // Asa de arrastre (móvil): bajar la hoja más de 90 px la cierra.
+  const drag = useRef<{ y: number; dy: number } | null>(null);
+  const gripDown = (e: PointerEvent<HTMLDivElement>) => {
+    if (!onClose) return;
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    drag.current = { y: e.clientY, dy: 0 };
+    if (sheetRef.current) sheetRef.current.style.transition = 'none';
+  };
+  const gripMove = (e: PointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    if (!d || !sheetRef.current) return;
+    d.dy = Math.max(0, e.clientY - d.y);
+    sheetRef.current.style.transform = `translateY(${d.dy}px)`;
+  };
+  const gripEnd = () => {
+    const d = drag.current;
+    drag.current = null;
+    const el = sheetRef.current;
+    if (!d || !el) return;
+    el.style.transition = 'transform 0.18s ease-out';
+    if (d.dy > 90) closeRef.current?.();
+    else el.style.transform = '';
+  };
+
   const trapTab = (e: KeyboardEvent) => {
     if (e.key !== 'Tab' || !sheetRef.current) return;
     const items = Array.from(sheetRef.current.querySelectorAll<HTMLElement>(FOCUSABLE));
@@ -122,6 +146,16 @@ export function Sheet({
         aria-label={label}
         tabIndex={-1}
       >
+        {onClose && (
+          <div
+            className="ll-grip"
+            aria-hidden="true"
+            onPointerDown={gripDown}
+            onPointerMove={gripMove}
+            onPointerUp={gripEnd}
+            onPointerCancel={gripEnd}
+          />
+        )}
         <div className="ll-sh-hd">
           <div>
             <h3>{title}</h3>

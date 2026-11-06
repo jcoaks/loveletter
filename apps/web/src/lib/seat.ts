@@ -25,18 +25,21 @@ export interface SeatData {
 
 export interface SeatChip {
   label: string;
+  /** Tipo de estado (clase CSS): en móvil solo se muestran los que cambian lo que puedes hacer. */
+  kind: 'out' | 'prot' | 'spy' | 'off' | 'bot' | 'on';
   /** Resaltado (turno). */
   on?: boolean;
 }
 
 export function seatChips(seat: SeatData): SeatChip[] {
   const chips: SeatChip[] = [];
-  if (seat.eliminated) chips.push({ label: agree('Eliminado', seat.gender) });
-  if (seat.protected) chips.push({ label: agree('Protegido', seat.gender) });
-  if (seat.spyPlayed) chips.push({ label: 'Espía jugado' });
-  if (seat.connected === false) chips.push({ label: agree('Desconectado', seat.gender) });
-  if (seat.bot) chips.push({ label: 'Bot' });
-  if (seat.isTurn) chips.push({ label: 'Su turno', on: true });
+  if (seat.eliminated) chips.push({ label: agree('Eliminado', seat.gender), kind: 'out' });
+  if (seat.protected) chips.push({ label: agree('Protegido', seat.gender), kind: 'prot' });
+  if (seat.spyPlayed) chips.push({ label: 'Espía jugado', kind: 'spy' });
+  if (seat.connected === false)
+    chips.push({ label: agree('Desconectado', seat.gender), kind: 'off' });
+  if (seat.bot) chips.push({ label: 'Bot', kind: 'bot' });
+  if (seat.isTurn) chips.push({ label: 'Su turno', on: true, kind: 'on' });
   return chips;
 }
 

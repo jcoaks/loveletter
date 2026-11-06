@@ -60,7 +60,7 @@ export function PauseOverlay() {
     return (
       <div
         role="status"
-        className="fixed inset-x-0 top-0 z-30 flex flex-wrap items-center justify-center gap-3 border-b border-gold/40 bg-wine px-4 py-2"
+        className="fixed inset-x-0 top-0 z-30 flex flex-wrap items-center justify-center gap-3 border-b border-gold/40 bg-wine px-4 pb-2 pt-[max(8px,env(safe-area-inset-top))]"
       >
         <span>Partida en pausa · esperando a {listNames(names)}</span>
         <button type="button" className="ll-ghost" onClick={() => setMinimizedAt(null)}>

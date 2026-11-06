@@ -128,7 +128,10 @@ export function CardFan({
   wrap?: boolean;
 }) {
   return (
-    <span className={`ll-fan${wrap ? ' wrap' : ''} ${className}`}>
+    <span
+      className={`ll-fan${wrap ? ' wrap' : ''} ${className}`}
+      style={{ '--tot': Math.max(1, cards.length) } as CSSProperties}
+    >
       {cards.map((v, i) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: los descartes son una lista ordenada que solo crece
         <Card key={`${i}-${v}`} value={v} size="sm" />

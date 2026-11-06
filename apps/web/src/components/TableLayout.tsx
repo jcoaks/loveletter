@@ -88,33 +88,35 @@ export function TableLayout({
               />
             ))}
           </div>
-          <div className="ll-center">
-            <div className="ll-pile">
-              <div className="ll-slot">
-                <DeckStack count={deckCount} />
+          <div className="ll-lower">
+            <div className="ll-center">
+              <div className="ll-pile">
+                <div className="ll-slot">
+                  <DeckStack count={deckCount} />
+                </div>
+                <span className="ll-lbl">Mazo</span>
               </div>
-              <span className="ll-lbl">Mazo</span>
-            </div>
-            {turn}
-            <div className="ll-pile">
-              <div className="ll-slot">
-                <span
-                  className="ll-fan"
-                  style={{ minHeight: 0, paddingLeft: 0 }}
-                  role="img"
-                  aria-label={`${aside === 1 ? 'Carta apartada' : 'Cartas apartadas'}: ${setAside.hidden} boca abajo${setAside.faceUp.length ? ` y ${setAside.faceUp.length} boca arriba` : ''}`}
-                >
-                  {Array.from({ length: setAside.hidden }, (_, i) => (
-                    // biome-ignore lint/suspicious/noArrayIndexKey: reversos idénticos
-                    <CardBack key={i} />
-                  ))}
-                  <CardFan cards={setAside.faceUp} />
-                </span>
+              {turn}
+              <div className="ll-pile">
+                <div className="ll-slot">
+                  <span
+                    className="ll-fan"
+                    style={{ minHeight: 0, paddingLeft: 0 }}
+                    role="img"
+                    aria-label={`${aside === 1 ? 'Carta apartada' : 'Cartas apartadas'}: ${setAside.hidden} boca abajo${setAside.faceUp.length ? ` y ${setAside.faceUp.length} boca arriba` : ''}`}
+                  >
+                    {Array.from({ length: setAside.hidden }, (_, i) => (
+                      // biome-ignore lint/suspicious/noArrayIndexKey: reversos idénticos
+                      <CardBack key={i} />
+                    ))}
+                    <CardFan cards={setAside.faceUp} />
+                  </span>
+                </div>
+                <span className="ll-lbl">{aside > 1 ? 'Apartadas' : 'Apartada'}</span>
               </div>
-              <span className="ll-lbl">{aside > 1 ? 'Apartadas' : 'Apartada'}</span>
             </div>
+            <div className="ll-me">{mine}</div>
           </div>
-          <div className="ll-me">{mine}</div>
         </div>
         {actions && <div className="ll-actbar">{actions}</div>}
         {log && <LogPanel entries={log} />}

@@ -4,9 +4,11 @@ import { ChancellorModal } from '../components/ChancellorModal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { DiscardsModal } from '../components/DiscardsModal';
 import { DrawLayer } from '../components/DrawLayer';
+import { GameMenu } from '../components/GameMenu';
 import { GuardModal } from '../components/GuessPicker';
 import { GuideModal } from '../components/GuideModal';
 import { HandRow } from '../components/HandRow';
+import { BookIcon, MoreIcon, ScrollIcon } from '../components/icons';
 import { LogModal } from '../components/LogModal';
 import { LogoLockup } from '../components/LogoLockup';
 import { PlayerPickerModal } from '../components/PlayerPickerModal';
@@ -19,6 +21,7 @@ import { TOAST_MS, ToastStack } from '../components/ToastStack';
 import { TurnBanner } from '../components/TurnBanner';
 import { useCanAct, useGame, useRoom } from '../hooks/room';
 import { useBotSpeech } from '../hooks/useBotSpeech';
+import { useTurnVibration, useWakeLock } from '../hooks/useDevice';
 import { useDraws } from '../hooks/useDraws';
 import { useTableReady } from '../hooks/useTableReady';
 import { effectExtraMs } from '../lib/cardFx';
@@ -115,6 +118,10 @@ export function GameScreen() {
   const closeDialog = useUiStore((s) => s.closeDialog);
   const noticeMode = useUiStore((s) => s.noticeMode);
   const setNoticeMode = useUiStore((s) => s.setNoticeMode);
+  const haptics = useUiStore((s) => s.haptics);
+  const setHaptics = useUiStore((s) => s.setHaptics);
+  const wake = useUiStore((s) => s.wake);
+  const setWake = useUiStore((s) => s.setWake);
 
   const [selected, setSelected] = useState<CardValue | null>(null);
   const [flow, setFlow] = useState<Flow>(null);
@@ -125,6 +132,7 @@ export function GameScreen() {
   const [submittedAt, setSubmittedAt] = useState<number | null>(null);
   const [endHidden, setEndHidden] = useState(false);
   const [logOpen, setLogOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [readCount, setReadCount] = useState<number | null>(null);
 
   const ctx = useMemo<TextContext>(
@@ -142,7 +150,12 @@ export function GameScreen() {
     [results.queue, results.toasts],
   );
   const modalOpen =
-    Boolean(flow) || Boolean(current) || seatInfo !== null || dialog !== null || logOpen;
+    Boolean(flow) ||
+    Boolean(current) ||
+    seatInfo !== null ||
+    dialog !== null ||
+    logOpen ||
+    menuOpen;
   const draws = useDraws(game, modalOpen);
   const baseSeats = useMemo(() => seatsOf(game, room), [game, room]);
   const seats = useMemo(
@@ -165,6 +178,32 @@ export function GameScreen() {
   const eventCount = game.events.length;
   const sending = submittedAt === eventCount;
   const ready = canAct && !sending;
+
+  useWakeLock(wake && game.phase !== 'game_over');
+  useTurnVibration(game.isMyTurn && game.phase === 'turn', haptics);
+  // Medidas de la mesa que el CSS necesita para colocar los avisos sin tapar lo importante.
+  useEffect(() => {
+    if (typeof ResizeObserver === 'undefined') return;
+    const root = document.documentElement;
+    const bar = document.querySelector('.ll-actbar');
+    const rivals = document.querySelector('.ll-rivals');
+    const set = () => {
+      if (bar) root.style.setProperty('--actbar-h', `${bar.getBoundingClientRect().height}px`);
+      if (rivals)
+        root.style.setProperty('--rivals-bottom', `${rivals.getBoundingClientRect().bottom}px`);
+    };
+    set();
+    const ro = new ResizeObserver(set);
+    if (bar) ro.observe(bar);
+    if (rivals) ro.observe(rivals);
+    window.addEventListener('resize', set);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', set);
+      root.style.removeProperty('--actbar-h');
+      root.style.removeProperty('--rivals-bottom');
+    };
+  }, []);
 
   const hand = game.you.hand;
   const plays = game.legalPlays;
@@ -265,7 +304,7 @@ export function GameScreen() {
         >
           Jugar {cardName(lp.card)}
         </button>
-        <span className="hint" id="act-hint">
+        <span className={`hint${hint === CARD_BY_VALUE[lp.card].text ? ' fx' : ''}`} id="act-hint">
           {hint}
         </span>
       </div>
@@ -307,18 +346,20 @@ export function GameScreen() {
             <LogoLockup />
           </button>
           <div className="ll-bar-actions" role="toolbar" aria-label="Opciones de la partida">
-            <button type="button" className="ll-ghost" onClick={() => openDialog('rules')}>
-              Reglas
+            <button type="button" className="ll-ghost ll-tool" onClick={() => openDialog('rules')}>
+              <BookIcon className="ll-ic" />
+              <span>Reglas</span>
             </button>
             <button
               type="button"
-              className="ll-ghost"
+              className="ll-ghost ll-tool"
               onClick={() => {
                 setReadCount(log.length);
                 setLogOpen(true);
               }}
             >
-              Registro
+              <ScrollIcon className="ll-ic" />
+              <span>Registro</span>
               {unread > 0 && (
                 <span className="ll-badge" role="img" aria-label={`${unread} sin leer`}>
                   {unread}
@@ -327,7 +368,7 @@ export function GameScreen() {
             </button>
             <button
               type="button"
-              className="ll-ghost ll-hide-lg"
+              className="ll-ghost ll-hide-lg ll-desk"
               aria-label="Carta guía"
               onClick={() => openDialog('guide')}
             >
@@ -336,7 +377,7 @@ export function GameScreen() {
             </button>
             <button
               type="button"
-              className="ll-ghost"
+              className="ll-ghost ll-desk"
               role="switch"
               aria-label={`Avisos de jugadas: ${noticeMode === 'full' ? 'completos' : 'breves'}`}
               aria-checked={noticeMode === 'full'}
@@ -345,8 +386,21 @@ export function GameScreen() {
               Avisos<span className="ll-hide-sm"> de jugadas</span>:{' '}
               {noticeMode === 'full' ? 'completos' : 'breves'}
             </button>
+            <button
+              type="button"
+              className="ll-ghost ll-more"
+              aria-haspopup="dialog"
+              onClick={() => setMenuOpen(true)}
+            >
+              <MoreIcon className="ll-ic" />
+              <span>Más</span>
+            </button>
           </div>
-          <button type="button" className="ll-ghost ll-exit" onClick={() => openDialog('leave')}>
+          <button
+            type="button"
+            className="ll-ghost ll-exit ll-desk"
+            onClick={() => openDialog('leave')}
+          >
             Salir
           </button>
           <ToastStack
@@ -406,6 +460,25 @@ export function GameScreen() {
       </div>
 
       <DrawLayer flights={draws.flights} onLand={draws.land} />
+      {menuOpen && (
+        <GameMenu
+          noticeMode={noticeMode}
+          onNoticeMode={setNoticeMode}
+          haptics={haptics}
+          onHaptics={setHaptics}
+          wake={wake}
+          onWake={setWake}
+          onGuide={() => {
+            setMenuOpen(false);
+            openDialog('guide');
+          }}
+          onLeave={() => {
+            setMenuOpen(false);
+            openDialog('leave');
+          }}
+          onClose={() => setMenuOpen(false)}
+        />
+      )}
       {logOpen && <LogModal entries={log} onClose={() => setLogOpen(false)} />}
       {dialog === 'rules' && <RulesModal onClose={closeDialog} />}
 
@@ -520,7 +593,7 @@ export function GameScreen() {
         />
       )}
       {game.phase === 'game_over' && endHidden && (
-        <div className="fixed inset-x-0 bottom-4 z-20 flex justify-center gap-2">
+        <div className="fixed inset-x-0 bottom-[max(16px,env(safe-area-inset-bottom))] z-20 flex justify-center gap-2">
           <button type="button" className="ll-play" onClick={() => setEndHidden(false)}>
             Ver el podio
           </button>

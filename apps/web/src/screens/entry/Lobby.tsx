@@ -100,7 +100,7 @@ export function LobbyScreen() {
         </p>
       </section>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="ll-lobby-cta grid gap-3 sm:grid-cols-2">
         {you && !you.bot && (
           <button
             type="button"
@@ -136,18 +136,36 @@ function InviteCard({ code }: { code: string }) {
   const [copied, setCopied] = useState<'idle' | 'link' | 'code' | 'fail'>('idle');
   const formatted = formatRoomCode(code);
   const link = `${window.location.origin}/sala/${formatted}`;
+  const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
   async function copy(what: 'link' | 'code') {
     const ok = await copyText(what === 'link' ? link : formatted);
     setCopied(ok ? what : 'fail');
     window.setTimeout(() => setCopied('idle'), 2500);
   }
+  // El menú de compartir del teléfono; si se cancela no pasa nada, si falla se copia el enlace.
+  async function share() {
+    try {
+      await navigator.share({
+        title: 'Love Letter',
+        text: `Únete a mi mesa de Love Letter (código ${formatted})`,
+        url: link,
+      });
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === 'AbortError')) await copy('link');
+    }
+  }
   return (
-    <div className="ll-panel flex flex-wrap items-center gap-4">
-      <div className="flex-[1_1_200px]">
+    <div className="ll-panel ll-invite">
+      <div>
         <span className="ll-lbl">Código de sala</span>
-        <div className="font-display text-4xl tracking-[0.12em] text-gold-light">{formatted}</div>
+        <div className="ll-invite-code">{formatted}</div>
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="ll-invite-btns">
+        {canShare && (
+          <button type="button" className="ll-play ll-invite-share" onClick={share}>
+            Compartir invitación
+          </button>
+        )}
         <button type="button" className="ll-ghost" onClick={() => copy('link')}>
           {copied === 'link' ? 'Enlace copiado' : 'Copiar enlace'}
         </button>

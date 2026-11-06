@@ -40,7 +40,7 @@ export function PlayNoticeModal({
   const other = notice.other;
   const rootRef = useRef<HTMLDivElement>(null);
   const reduced = useRef(prefersReducedMotion());
-  const { elapsed, secondsLeft, pointer } = useCountdown({
+  const { elapsed, secondsLeft, paused, pointer } = useCountdown({
     ms: autoCloseMs,
     resetKey: notice.key,
     onDone: onContinue,
@@ -64,9 +64,9 @@ export function PlayNoticeModal({
       onClose={onContinue}
     >
       <div className="grid gap-4" ref={rootRef} {...pointer}>
-        <div className="flex flex-wrap items-center justify-center gap-5">
+        <div className="ll-notice-row">
           <Card value={other.card} ariaLabel={`Carta jugada: ${notice.label}`} />
-          <div className="grid min-w-[200px] flex-1 gap-2">
+          <div className="ll-notice-txt grid">
             <p className="m-0">
               <span className="ll-lbl">Jugó</span>
               <br />
@@ -113,7 +113,11 @@ export function PlayNoticeModal({
                 />
               </div>
             )}
-            <span className="ll-lbl">Se cierra en {secondsLeft} s</span>
+            <span className="ll-lbl" style={{ textTransform: 'none', letterSpacing: 0 }}>
+              {paused
+                ? 'En pausa · toca para seguir'
+                : `Se cierra en ${secondsLeft} s · toca para pausar`}
+            </span>
           </div>
           <button type="button" className="ll-play" onClick={onContinue}>
             Entendido

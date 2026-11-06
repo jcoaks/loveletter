@@ -404,7 +404,7 @@ describe('GameScreen: avisos de jugadas ajenas', () => {
       d.getByText('Ana jugó el Guardia contra Beto y nombró el Príncipe: falló.'),
     ).toBeInTheDocument();
     expect(d.getByText('Público')).toBeInTheDocument();
-    expect(d.getByText('Se cierra en 5 s')).toBeInTheDocument();
+    expect(d.getByText(/Se cierra en 5 s/)).toBeInTheDocument();
   });
 
   it('tu propia jugada no abre aviso de jugada ajena', async () => {
@@ -631,7 +631,7 @@ describe('GameScreen: avisos de tus jugadas triviales', () => {
       expect(d.getByText('Qué hace')).toBeInTheDocument();
       expect(d.getByText(new RegExp(fx))).toBeInTheDocument();
       // Las frases largas suman tiempo de lectura.
-      expect(d.getByText(`Se cierra en ${secs} s`)).toBeInTheDocument();
+      expect(d.getByText(new RegExp(`Se cierra en ${secs} s`))).toBeInTheDocument();
       await rtlAct(() => vi.advanceTimersByTimeAsync(secs * 1000 + 600));
       expect(screen.queryByRole('dialog')).toBeNull();
     },
