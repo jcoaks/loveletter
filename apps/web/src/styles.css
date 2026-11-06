@@ -1391,6 +1391,56 @@ body {
     color: var(--color-gold-light);
   }
 
+  /* ---------- Sello de "listo" ---------- */
+  .ll-seal-slot {
+    flex: none;
+    width: 52px;
+    height: 52px;
+    display: grid;
+    place-items: center;
+  }
+  .ll-seal {
+    width: 48px;
+    height: 48px;
+    display: block;
+    transform: rotate(-8deg);
+    filter: drop-shadow(0 3px 4px rgb(0 0 0 / 0.45));
+  }
+  .ll-seal.stamp {
+    animation: ll-stamp 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+  }
+  .ll-seal.fade {
+    animation: ll-unstamp 0.25s ease-out both;
+  }
+  @keyframes ll-stamp {
+    0% {
+      opacity: 0;
+      transform: scale(2.4) rotate(-22deg);
+    }
+    55% {
+      opacity: 1;
+      transform: scale(0.9) rotate(-6deg);
+    }
+    80% {
+      transform: scale(1.06) rotate(-9deg);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1) rotate(-8deg);
+    }
+  }
+  @keyframes ll-unstamp {
+    to {
+      opacity: 0;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ll-seal.stamp,
+    .ll-seal.fade {
+      animation-duration: 0.01s;
+    }
+  }
+
   /* ---------- Cartas en vuelo (robos) ---------- */
   .ll-pending {
     visibility: hidden;

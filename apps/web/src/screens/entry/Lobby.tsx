@@ -1,6 +1,7 @@
 import { formatRoomCode, type RoomPlayer, type RoomView } from '@loveletter/protocol';
 import { useState } from 'react';
 import { LogoLockup } from '../../components/LogoLockup';
+import { ReadySeal } from '../../components/ReadySeal';
 import { RulesModal } from '../../components/RulesContent';
 import { useCanAct, useRoom } from '../../hooks/room';
 import { TOKENS_TO_WIN } from '../../lib/cards';
@@ -179,7 +180,7 @@ function PlayerRow({
       ? 'Desconectado'
       : player.ready
         ? 'Listo'
-        : 'Aún no está listo';
+        : 'Esperando';
   return (
     <li className="flex items-center gap-3 rounded-xl border border-gold/30 bg-black/25 px-3 py-2">
       <span className="flex min-w-0 flex-1 flex-col">
@@ -188,8 +189,13 @@ function PlayerRow({
           {player.id === room.hostId && <i className="ll-chip on ml-2">Anfitrión</i>}
           {player.bot && <i className="ll-chip ml-2">Bot</i>}
         </span>
-        <span className="text-sm text-ivory/75">{status}</span>
+        <span
+          className={`text-sm ${player.bot || player.ready ? 'text-ivory/75' : 'text-ivory/45'}`}
+        >
+          {status}
+        </span>
       </span>
+      <ReadySeal ready={player.bot || player.ready} fixed={player.bot} />
       {canRemove && (
         <button
           type="button"

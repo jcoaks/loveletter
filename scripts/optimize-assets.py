@@ -40,3 +40,7 @@ for src, name, size, q, mode in extras:
 g = Image.open(SRC / 'hero-group.webp').convert('RGB')
 w, h = g.size
 save(g.crop((int(w * 0.27), 0, w, h)), 'hero-group-m.webp', (640, 700), 74)
+
+# Sello de cera (sala de espera: jugador listo), con fondo transparente.
+if (SRC / 'seal.png').exists():
+    save(Image.open(SRC / 'seal.png').convert('RGBA'), 'seal.webp', (112, 112), 88)

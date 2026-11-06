@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useParams } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -205,5 +205,87 @@ describe('Sala de espera', () => {
     await waitFor(() =>
       expect(writeText).toHaveBeenCalledWith(expect.stringContaining('/sala/KX7-QM2')),
     );
+  });
+});
+
+describe('Sello de listo en la sala de espera', () => {
+  const seat = (id: string, name: string, ready: boolean, bot = false) => ({
+    id,
+    name,
+    ready,
+    connected: true,
+    left: false,
+    bot,
+    host: id === 'a',
+  });
+  const room = (players: ReturnType<typeof seat>[]) => ({
+    code: 'KX7QM2',
+    status: 'lobby' as const,
+    you: { id: 'a', isHost: true },
+    hostId: 'a',
+    players,
+    config: { bots: 0 },
+    limits: { minPlayers: 2, maxPlayers: 6 },
+    canStart: false,
+    game: null,
+    chat: [],
+    pause: null,
+  });
+  const show = (players: ReturnType<typeof seat>[]) => {
+    useRoomStore.setState({
+      code: 'KX7QM2',
+      status: 'open',
+      room: room(players),
+      send: vi.fn() as never,
+    });
+    return render(
+      <MemoryRouter>
+        <LobbyScreen />
+      </MemoryRouter>,
+    );
+  };
+  const rowOf = (name: string) =>
+    screen.getAllByRole('listitem').find((li) => li.textContent?.startsWith(name)) as HTMLElement;
+  const seals = (el: ParentNode) => el.querySelectorAll('img.ll-seal');
+
+  it('sello para los listos, no para los que esperan; el texto accesible sigue ahí', () => {
+    show([seat('a', 'Ana', true), seat('b', 'Beto', true), seat('c', 'Carla', false)]);
+    expect(seals(rowOf('Ana'))).toHaveLength(1);
+    expect(seals(rowOf('Beto'))).toHaveLength(1);
+    expect(seals(rowOf('Carla'))).toHaveLength(0);
+    expect(within(rowOf('Beto')).getByText('Listo')).toBeInTheDocument();
+    expect(within(rowOf('Carla')).getByText('Esperando')).toBeInTheDocument();
+    // El sello es decorativo y reserva su sitio aunque no esté.
+    expect(rowOf('Carla').querySelector('.ll-seal-slot')).not.toBeNull();
+    expect(rowOf('Beto').querySelector('.ll-seal-slot')?.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('los bots llevan el sello fijo, sin animación', () => {
+    show([seat('a', 'Ana', false), seat('r', 'Robo', true, true)]);
+    const seal = seals(rowOf('Robo'))[0];
+    expect(seal).toBeDefined();
+    expect(seal).not.toHaveClass('stamp');
+  });
+
+  it('no se anima al montar; sí al pasar a listo después, y se desvanece al dejar de estarlo', async () => {
+    const { rerender } = show([seat('a', 'Ana', true), seat('b', 'Beto', false)]);
+    expect(seals(rowOf('Ana'))[0]).not.toHaveClass('stamp');
+    useRoomStore.setState({ room: room([seat('a', 'Ana', true), seat('b', 'Beto', true)]) });
+    rerender(
+      <MemoryRouter>
+        <LobbyScreen />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(seals(rowOf('Beto'))[0]).toHaveClass('stamp'));
+    // Quien ya estaba listo no se vuelve a animar.
+    expect(seals(rowOf('Ana'))[0]).not.toHaveClass('stamp');
+    useRoomStore.setState({ room: room([seat('a', 'Ana', true), seat('b', 'Beto', false)]) });
+    rerender(
+      <MemoryRouter>
+        <LobbyScreen />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(seals(rowOf('Beto'))[0]).toHaveClass('fade'));
+    await waitFor(() => expect(seals(rowOf('Beto'))).toHaveLength(0), { timeout: 1500 });
   });
 });
