@@ -210,18 +210,27 @@ describe('GameScreen: fuga de datos', () => {
     const { act, container } = mount(before, 'p2');
     const afterPriest = play(before, 2, 'p1');
     rtlAct(() => seed(afterPriest, 'p2', { act }));
+    // Ve el aviso público de la jugada, nunca lo que Ana vio.
+    const notice = within(await screen.findByRole('dialog', { name: 'Jugada de Ana: Sacerdote' }));
+    expect(notice.getByText('Público')).toBeInTheDocument();
+    expect(notice.queryByText(/Barón/)).toBeNull();
+    await userEvent.setup().click(notice.getByRole('button', { name: 'Continuar' }));
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(container.querySelectorAll('.ll-seat .ll-card:not(.sm)')).toHaveLength(0);
     // La crónica dice que miró, no qué vio.
-    expect(screen.getByText('Ana jugó el Sacerdote y miró la mano de Beto.')).toBeInTheDocument();
-    expect(screen.queryByText(/tenía un Barón/)).toBeNull();
+    await userEvent.setup().click(screen.getByRole('button', { name: /^Registro/ }));
+    const log = within(screen.getByRole('dialog', { name: 'Registro de jugadas' }));
+    expect(log.getByText('Ana jugó el Sacerdote y miró la mano de Beto.')).toBeInTheDocument();
+    expect(log.queryByText(/tenía un Barón/)).toBeNull();
+    await userEvent.setup().keyboard('{Escape}');
 
     cleanup();
     const k = rig({ hands: [[7, 1], [3], [4]] });
     const m = mount(k, 'p2');
     rtlAct(() => seed(play(k, 7, 'p1'), 'p2', { act: m.act }));
-    expect(screen.queryByRole('dialog')).toBeNull();
-    expect(screen.queryByText(/Recibiste/)).toBeNull();
+    const kn = within(await screen.findByRole('dialog', { name: 'Jugada de Ana: Rey' }));
+    expect(kn.queryByText(/Recibiste|Recibes/)).toBeNull();
+    expect(kn.queryByRole('img', { name: /Guardia|Barón/ })).toBeNull();
     // La vista que recibe el cliente no lleva la mano ajena.
     expect(JSON.stringify(roomFor(play(k, 7, 'p1'), 'p2').game)).not.toContain('"hands"');
   });
@@ -349,5 +358,140 @@ describe('GameScreen: bots', () => {
       ),
     );
     expect(await screen.findByText('¡Qué mala suerte!', {}, { timeout: 3000 })).toBeInTheDocument();
+  });
+});
+
+describe('GameScreen: avisos de jugadas ajenas', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    localStorage.clear();
+    useUiStore.setState({ noticeMode: 'full' });
+  });
+
+  function watch(before: GameState, after: GameState, viewer: string) {
+    const fns = { act: vi.fn(() => true), send: vi.fn(() => true) };
+    seed(before, viewer, fns);
+    render(
+      <MemoryRouter>
+        <GameScreen />
+      </MemoryRouter>,
+    );
+    rtlAct(() => seed(after, viewer, fns));
+    return { ...fns, user: userEvent.setup() };
+  }
+
+  it('muestra quién, la carta grande, contra quién y el resultado; no es tu jugada', async () => {
+    const before = rig({ hands: [[1, 2], [3], [4]] });
+    watch(before, play(before, 1, 'p1', 5), 'p2');
+    const d = within(await screen.findByRole('dialog', { name: 'Jugada de Ana: Guardia' }));
+    expect(d.getByRole('heading', { name: 'Ana jugó el Guardia' })).toBeInTheDocument();
+    expect(d.getByRole('img', { name: /Guardia/ })).toBeInTheDocument();
+    expect(d.getByText('Beto')).toBeInTheDocument();
+    expect(
+      d.getByText('Ana jugó el Guardia contra Beto y nombró el Príncipe: falló.'),
+    ).toBeInTheDocument();
+    expect(d.getByText('Público')).toBeInTheDocument();
+    expect(d.getByText('Se cierra en 5 s')).toBeInTheDocument();
+  });
+
+  it('tu propia jugada no abre aviso de jugada ajena', async () => {
+    const before = rig({ hands: [[2, 7], [3], [4]] });
+    watch(before, play(before, 2, 'p1'), 'p0');
+    await screen.findByRole('dialog', { name: 'Resultado: Sacerdote' });
+    expect(screen.queryByRole('dialog', { name: /^Jugada de/ })).toBeNull();
+  });
+
+  it('los avisos que no te afectan se cierran solos; los que sí, esperan a Continuar', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const before = rig({ hands: [[1, 2], [3], [4]] });
+    const after = play(before, 1, 'p1', 5);
+    watch(before, after, 'p2');
+    await screen.findByRole('dialog', { name: 'Jugada de Ana: Guardia' });
+    await rtlAct(() => vi.advanceTimersByTimeAsync(2000));
+    await rtlAct(() => vi.advanceTimersByTimeAsync(3600));
+    expect(screen.queryByRole('dialog', { name: /^Jugada de/ })).toBeNull();
+
+    cleanup();
+    watch(before, after, 'p1');
+    await screen.findByRole('dialog', { name: 'Jugada de Ana: Guardia' });
+    expect(screen.queryByText(/Se cierra en/)).toBeNull();
+    await rtlAct(() => vi.advanceTimersByTimeAsync(8000));
+    expect(screen.getByRole('dialog', { name: 'Jugada de Ana: Guardia' })).toBeInTheDocument();
+  });
+
+  it('la cuenta se pausa al pasar el cursor', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const before = rig({ hands: [[1, 2], [3], [4]] });
+    watch(before, play(before, 1, 'p1', 5), 'p2');
+    const d = await screen.findByRole('dialog', { name: 'Jugada de Ana: Guardia' });
+    const inner = within(d).getByRole('status').closest('div.grid') as HTMLElement;
+    const { fireEvent } = await import('@testing-library/react');
+    fireEvent.mouseEnter(inner.parentElement as HTMLElement);
+    await rtlAct(() => vi.advanceTimersByTimeAsync(7000));
+    expect(screen.getByRole('dialog', { name: 'Jugada de Ana: Guardia' })).toBeInTheDocument();
+  });
+
+  it('cola ordenada: una tras otra y table_ready al cerrar la última', async () => {
+    const before = rig({ hands: [[4, 2], [1], [3]], deck: [5, 1, 1, 1] });
+    const after = play(play(before, 4), 1, 'p2', 5);
+    const { user, send } = watch(before, after, 'p2');
+    const first = within(await screen.findByRole('dialog', { name: 'Jugada de Ana: Doncella' }));
+    expect(
+      first.getByText('Ana jugó la Doncella: queda protegido hasta su próximo turno.'),
+    ).toBeInTheDocument();
+    await user.click(first.getByRole('button', { name: 'Continuar' }));
+    const second = within(await screen.findByRole('dialog', { name: 'Jugada de Beto: Guardia' }));
+    expect(second.getByText('Ti')).toBeInTheDocument();
+    expect(send).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'table_ready', moment: tableMoment(viewFor(after, 'p2')) }),
+    );
+    await user.click(second.getByRole('button', { name: 'Continuar' }));
+    await waitFor(
+      () =>
+        expect(send).toHaveBeenCalledWith({
+          type: 'table_ready',
+          moment: tableMoment(viewFor(after, 'p2')),
+        }),
+      { timeout: 3000 },
+    );
+  });
+
+  it('modo breve: aviso no bloqueante y la preferencia se recuerda', async () => {
+    const before = rig({ hands: [[1, 2], [3], [4]] });
+    const { user } = watch(before, before, 'p2');
+    await user.click(screen.getByRole('switch', { name: /Avisos de jugadas: completos/ }));
+    expect(localStorage.getItem('loveletter:notices')).toBe('brief');
+    expect(screen.getByRole('switch', { name: /Avisos de jugadas: breves/ })).toBeInTheDocument();
+    rtlAct(() => seed(play(before, 1, 'p1', 5), 'p2'));
+    expect(await screen.findByText('Ana jugó el Guardia')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('un evento nuevo suma al contador del registro', async () => {
+    const before = rig({ hands: [[1, 2], [3], [4]] });
+    const { user } = watch(before, play(before, 1, 'p1', 5), 'p2');
+    expect(await screen.findByLabelText(/sin leer/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^Registro/ }));
+    expect(screen.queryByLabelText(/sin leer/)).toBeNull();
+  });
+
+  it('el botón Reglas abre un modal sin salir de la partida y Escape lo cierra', async () => {
+    const { user } = watch(
+      rig({ hands: [[1, 2], [3], [4]] }),
+      rig({ hands: [[1, 2], [3], [4]] }),
+      'p0',
+    );
+    await user.click(screen.getByRole('button', { name: 'Reglas' }));
+    const d = within(screen.getByRole('dialog', { name: 'Reglas del juego' }));
+    expect(d.getByText('Las 10 cartas')).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Jugar Guardia' })).toBeInTheDocument();
+  });
+
+  it('tus descartes y el botón de jugar están en la mesa, sin abrir nada', () => {
+    mount(rig({ hands: [[1, 2], [3], [4]], discards: { 0: [4, 5] } }));
+    expect(screen.getByRole('button', { name: /^Tus descartes: 2/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Jugar Guardia' })).toBeInTheDocument();
   });
 });

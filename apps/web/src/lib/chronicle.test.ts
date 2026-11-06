@@ -117,15 +117,116 @@ describe('resultados', () => {
     expect(none[0]).toMatchObject({ style: 'toast', title: 'Sin efecto.' });
   });
 
-  it('no filtra nada a un tercero', () => {
+  it('no genera aviso para tus propias jugadas ni para sucesos que no son jugadas', () => {
     const s = play(rig({ hands: [[2, 7], [3], [4]] }), 2, 'p1');
-    expect(buildResults(ev(s, 'p2'), ctxFor('p2'))).toEqual([]);
+    expect(buildResults(ev(s, 'p0'), ctxFor('p0')).every((r) => !r.other)).toBe(true);
+  });
+});
+
+describe('avisos de jugadas ajenas', () => {
+  const notices = (state: ReturnType<typeof rig>, me: string) =>
+    buildResults(ev(state, me), ctxFor(me)).filter((r) => r.other);
+
+  it('Guardia fallado contra otro: público, sin afectarte', () => {
+    const s = play(rig({ hands: [[1, 2], [3], [4]] }), 1, 'p1', 5);
+    const [n] = notices(s, 'p2');
+    expect(n).toMatchObject({ title: 'Ana jugó el Guardia', visibility: 'public', hit: false });
+    expect(n?.other).toMatchObject({ actorId: 'p0', card: 1, targetId: 'p1', affectsMe: false });
+    expect(n?.body).toBe('Ana jugó el Guardia contra Beto y nombró el Príncipe: falló.');
   });
 
-  it('el Rey avisa a quien lo sufre', () => {
-    const s = play(rig({ hands: [[7, 1], [3], [4]] }), 7, 'p1');
-    const r = buildResults(ev(s, 'p1'), ctxFor('p1'));
-    expect(r[0]).toMatchObject({ style: 'toast' });
-    expect(r[0]?.body).toContain('Recibiste un Guardia');
+  it('Guardia acertado contra otro y contra ti', () => {
+    const s = play(rig({ hands: [[1, 2], [3], [4]] }), 1, 'p1', 3);
+    const [other] = notices(s, 'p2');
+    expect(other?.body).toContain('acertó. Beto queda fuera');
+    expect(other).toMatchObject({ hit: true });
+    expect(other?.other?.affectsMe).toBe(false);
+    const [me] = notices(s, 'p1');
+    expect(me?.body).toBe('Ana jugó el Guardia contra ti y nombró el Barón: acertó. Quedas fuera.');
+    expect(me?.other?.affectsMe).toBe(true);
+  });
+
+  it('Guardia fallado contra ti te afecta aunque sigas en juego', () => {
+    const s = play(rig({ hands: [[1, 2], [3], [4]] }), 1, 'p1', 5);
+    const [n] = notices(s, 'p1');
+    expect(n?.body).toContain('contra ti');
+    expect(n?.body).toContain('falló');
+    expect(n?.other?.affectsMe).toBe(true);
+  });
+
+  it('Barón: eliminación, empate y contra ti con ambas manos', () => {
+    const baron = play(rig({ hands: [[3, 2], [5], [4]] }), 3, 'p1');
+    expect(notices(baron, 'p2')[0]?.body).toContain(
+      'la mano de Ana era la más baja (Sacerdote) y Ana queda fuera',
+    );
+    expect(notices(baron, 'p2')[0]?.faces).toEqual([]);
+    const tie = play(rig({ hands: [[3, 3], [3], [4]] }), 3, 'p1');
+    expect(notices(tie, 'p2')[0]?.body).toContain('empate, nadie queda fuera');
+    const mine = notices(baron, 'p1')[0];
+    expect(mine?.faces).toEqual([
+      { caption: 'Tu mano', value: 5 },
+      { caption: 'Ana', value: 2 },
+    ]);
+    expect(mine?.visibility).toBe('public');
+    expect(mine?.other?.affectsMe).toBe(true);
+  });
+
+  it('Príncipe sobre otro, sobre sí con la Princesa y sobre ti', () => {
+    const onOther = play(rig({ hands: [[5, 2], [3], [4]] }), 5, 'p1');
+    expect(notices(onOther, 'p2')[0]?.body).toContain('descartó el Barón y robó una carta nueva');
+    const self = play(rig({ hands: [[5, 9], [3], [4]] }), 5, 'p0');
+    const [n] = notices(self, 'p2');
+    expect(n?.body).toBe(
+      'Ana jugó el Príncipe contra sí mismo: descartó la Princesa y Ana queda fuera.',
+    );
+    expect(n?.hit).toBe(true);
+    const onMe = play(rig({ hands: [[5, 2], [3], [4]], deck: [8, 1, 1, 1] }), 5, 'p1');
+    const mine = notices(onMe, 'p1')[0];
+    expect(mine?.faces).toEqual([
+      { caption: 'Descartas', value: 3 },
+      { caption: 'Nueva', value: 8 },
+    ]);
+    expect(mine?.visibility).toBe('private');
+    // Un tercero no ve la carta nueva.
+    expect(notices(onMe, 'p2')[0]?.faces).toEqual([]);
+  });
+
+  it('Doncella, Espía y Canciller no tienen objetivo', () => {
+    for (const [card, text] of [
+      [4, 'queda protegido'],
+      [0, 'sin efecto'],
+      [6, 'robó 2 cartas'],
+    ] as const) {
+      const s = play(rig({ hands: [[card, 2], [3], [4]] }), card);
+      const [n] = notices(s, 'p2');
+      expect(n?.body).toContain(text);
+      expect(n?.other).toMatchObject({ targetId: null, affectsMe: false });
+    }
+  });
+
+  it('Rey y Sacerdote como objetivo; un tercero no ve nada secreto', () => {
+    const king = play(rig({ hands: [[7, 1], [3], [4]] }), 7, 'p1');
+    const [k] = notices(king, 'p1');
+    expect(k?.body).toContain('Recibiste un Guardia');
+    expect(k?.faces).toContainEqual({ caption: 'Recibes', value: 1 });
+    expect(k).toMatchObject({ visibility: 'private' });
+    expect(k?.other?.affectsMe).toBe(true);
+    const third = notices(king, 'p2')[0];
+    expect(third?.faces).toEqual([]);
+    expect(third?.body).not.toMatch(/Recibiste|Guardia|Barón/);
+
+    const priest = play(rig({ hands: [[2, 7], [3], [4]] }), 2, 'p1');
+    const [p] = notices(priest, 'p1');
+    expect(p?.body).toBe('Ana jugó el Sacerdote y miró tu mano.');
+    expect(p?.other?.affectsMe).toBe(true);
+    expect(notices(priest, 'p2')[0]?.body).toBe('Ana jugó el Sacerdote y miró la mano de Beto.');
+  });
+
+  it('varias jugadas seguidas salen en orden', () => {
+    const s = play(play(rig({ hands: [[4, 2], [1], [3]], deck: [5, 1, 1, 1] }), 4), 1, 'p2', 5);
+    const list = notices(s, 'p2');
+    expect(list.map((n) => n.other?.actorId)).toEqual(['p0', 'p1']);
+    const ids = list.map((n) => Number(n.key.slice(3)));
+    expect(ids[0]).toBeLessThan(ids[1] as number);
   });
 });

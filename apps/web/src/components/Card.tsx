@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { type CSSProperties, useState } from 'react';
 import { artUrl, CARD_BY_VALUE, type CardValue } from '../lib/cards';
 import { CardIcon } from './icons';
 
@@ -112,8 +112,8 @@ export function Card({
 }
 
 /** Reverso de carta (tamaño pequeño). */
-export function CardBack({ className = '' }: { className?: string }) {
-  return <span className={`ll-back ${className}`} aria-hidden="true" />;
+export function CardBack({ className = '', style }: { className?: string; style?: CSSProperties }) {
+  return <span className={`ll-back ${className}`} style={style} aria-hidden="true" />;
 }
 
 /** Hilera superpuesta de cartas pequeñas. */

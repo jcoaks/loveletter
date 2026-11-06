@@ -43,18 +43,20 @@ export function SeatCard({
           </i>
         ))}
       </span>
-      <span className="ll-backs">
-        {!seat.eliminated &&
-          Array.from({ length: seat.handCount }, (_, i) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: reversos idénticos
-            <CardBack key={i} />
-          ))}
-      </span>
-      <span>
-        <span className="ll-lbl">Descartes{onOpen ? ' · ver detalle' : ''}</span>
+      <span className="ll-seat-row">
+        <span className="ll-backs">
+          {!seat.eliminated &&
+            Array.from({ length: seat.handCount }, (_, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: reversos idénticos
+              <CardBack key={i} />
+            ))}
+        </span>
         <CardFan cards={seat.discards} />
       </span>
-      <Tokens count={seat.tokens} total={toWin} />
+      <span className="ll-seat-foot">
+        <Tokens count={seat.tokens} total={toWin} />
+        <span className="ll-lbl">Descartes{onOpen ? ' · ver' : ''}</span>
+      </span>
     </>
   );
   if (!onOpen) {

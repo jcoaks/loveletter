@@ -32,3 +32,11 @@ export const lastName = {
   get: () => read(NAME_KEY) ?? '',
   set: (name: string) => write(NAME_KEY, name),
 };
+
+export type NoticeMode = 'full' | 'brief';
+
+/** Avisos de jugadas ajenas: ventana completa (por omisión) o solo un aviso breve. */
+export const noticeModePref = {
+  get: (): NoticeMode => (read('loveletter:notices') === 'brief' ? 'brief' : 'full'),
+  set: (mode: NoticeMode) => write('loveletter:notices', mode === 'brief' ? 'brief' : null),
+};

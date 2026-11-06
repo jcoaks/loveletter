@@ -1,6 +1,6 @@
 import { formatRoomCode, type RoomPlayer, type RoomView } from '@loveletter/protocol';
 import { useState } from 'react';
-import { Link } from 'react-router';
+import { RulesModal } from '../../components/RulesContent';
 import { useCanAct, useRoom } from '../../hooks/room';
 import { TOKENS_TO_WIN } from '../../lib/cards';
 import { useRoomStore } from '../../store/room';
@@ -22,6 +22,8 @@ export function LobbyScreen() {
   const send = useRoomStore((s) => s.send);
   const canAct = useCanAct();
   const openDialog = useUiStore((s) => s.openDialog);
+  const dialog = useUiStore((s) => s.dialog);
+  const closeDialog = useUiStore((s) => s.closeDialog);
   const you = room.players.find((p) => p.id === room.you.id);
   const { minPlayers, maxPlayers } = room.limits;
   const count = room.players.length;
@@ -39,9 +41,9 @@ export function LobbyScreen() {
       <header className="flex flex-wrap items-center justify-between gap-3">
         <Logo width={200} />
         <div className="flex items-center gap-2">
-          <Link to="/reglas" target="_blank" className="ll-link inline-flex min-h-11 items-center">
-            Cómo se juega
-          </Link>
+          <button type="button" className="ll-ghost" onClick={() => openDialog('rules')}>
+            Reglas
+          </button>
           <button type="button" className="ll-ghost" onClick={() => openDialog('leave')}>
             Salir
           </button>
@@ -124,6 +126,7 @@ export function LobbyScreen() {
           </p>
         )}
       </div>
+      {dialog === 'rules' && <RulesModal onClose={closeDialog} />}
     </main>
   );
 }

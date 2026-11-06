@@ -391,15 +391,62 @@ body {
     text-align: left;
     background: rgb(0 0 0 / 0.25);
     border: 1px solid rgb(201 164 92 / 0.28);
-    border-radius: 14px;
-    padding: 12px;
+    border-radius: 12px;
+    padding: 8px 10px;
     display: grid;
-    gap: 10px;
+    gap: 6px;
     align-content: start;
     min-width: 0;
+    position: relative;
     transition:
       border-color 0.15s,
       background 0.15s;
+  }
+  .ll-seat-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    min-height: calc(var(--card-w-sm) * 1.4);
+  }
+  .ll-seat-row .ll-fan {
+    min-height: 0;
+    flex: 1;
+    min-width: 0;
+  }
+  .ll-seat .ll-fan > * + *,
+  .ll-mine .ll-fan > * + * {
+    margin-left: calc(var(--card-w-sm) * -0.55);
+  }
+  .ll-seat-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .ll-seat-foot .ll-lbl {
+    font-size: 11px;
+  }
+  @media (max-width: 779px) {
+    .ll-seat-foot .ll-lbl {
+      display: none;
+    }
+    .ll-seat {
+      padding: 6px 8px;
+    }
+  }
+  .ll-hide-sm {
+    display: none;
+  }
+  @media (min-width: 480px) {
+    .ll-hide-sm {
+      display: inline;
+    }
+  }
+  @media (min-width: 1200px) and (min-height: 540px) {
+    .ll-hide-lg {
+      display: none;
+    }
   }
   button.ll-seat {
     cursor: pointer;
@@ -489,98 +536,105 @@ body {
   }
 
   /* ---------- Mesa ---------- */
+  /* Móvil y pantallas bajas: flujo normal, con la barra de acciones pegada abajo. */
+  .ll-game {
+    min-height: 100dvh;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .ll-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 8px clamp(12px, 2vw, 20px) 0;
+  }
+  .ll-bar .ll-ghost {
+    position: relative;
+    padding: 4px 12px;
+  }
+  .ll-bar .ll-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .ll-badge {
+    display: inline-block;
+    min-width: 20px;
+    margin-left: 6px;
+    padding: 0 6px;
+    border-radius: 99px;
+    background: var(--color-wax);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 20px;
+    text-align: center;
+  }
   .ll-board {
     display: grid;
-    gap: 16px;
-    padding: clamp(12px, 2.5vw, 24px);
-    max-width: 1380px;
+    gap: 12px;
+    padding: 8px clamp(12px, 2vw, 20px) 0;
+    width: 100%;
+    max-width: 1500px;
     margin: 0 auto;
-  }
-  @media (min-width: 1200px) {
-    .ll-board {
-      grid-template-columns: minmax(0, 1fr) 236px;
-      align-items: start;
-    }
+    box-sizing: border-box;
+    min-height: 0;
   }
   .ll-main {
     display: grid;
-    gap: 16px;
+    grid-template-rows: minmax(0, 1fr) auto;
+    gap: 0;
     min-width: 0;
+    min-height: 0;
   }
   .ll-table {
     display: grid;
-    gap: 12px;
-    grid-template-columns: 1fr 1fr;
-    grid-template-areas: "t t" "l r" "c c" "m m";
+    gap: 10px;
+    grid-template-rows: auto auto minmax(0, 1fr);
     border: 1px solid rgb(201 164 92 / 0.35);
-    border-radius: 28px;
-    padding: clamp(10px, 2vw, 22px);
+    border-radius: 22px;
+    padding: 10px;
     background: rgb(0 0 0 / 0.14);
+    min-height: 0;
   }
-  @media (min-width: 780px) {
-    .ll-table {
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr) minmax(0, 1fr);
-      grid-template-areas: "t t t" "l c r" "m m m";
-      border-radius: 56px;
-    }
-    .ll-table .left,
-    .ll-table .right {
-      align-self: center;
-    }
-  }
-  .ll-table.few {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "t" "c" "m";
-    border-radius: 28px;
-  }
-  .ll-table.notop {
-    grid-template-areas: "l r" "c c" "m m";
-  }
-  @media (min-width: 780px) {
-    .ll-table.notop {
-      grid-template-areas: "l c r" "m m m";
-    }
-  }
-  .ll-table .left {
-    grid-area: l;
-  }
-  .ll-table .right {
-    grid-area: r;
-  }
-  .ll-toprow {
-    grid-area: t;
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-evenly;
-    gap: 12px;
+  .ll-rivals {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     min-width: 0;
   }
-  .ll-toprow > * {
-    flex: 0 1 calc(50% - 6px);
-    min-width: 150px;
-  }
   @media (min-width: 780px) {
-    .ll-toprow > * {
-      flex-basis: 31.7%;
+    .ll-rivals {
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    }
+    .ll-rivals[data-count="1"] {
+      grid-template-columns: minmax(0, 420px);
+      justify-content: center;
+    }
+    .ll-rivals[data-count="2"] {
+      grid-template-columns: repeat(2, minmax(0, 380px));
+      justify-content: center;
     }
   }
   .ll-center {
-    grid-area: c;
-    align-self: center;
-    display: grid;
-    grid-template-columns: minmax(max-content, 1fr) minmax(0, 2.4fr) minmax(max-content, 1fr);
-    gap: 14px;
-    align-items: stretch;
-    padding: 6px 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(10px, 3vw, 28px);
   }
   .ll-pile {
     display: grid;
-    align-content: center;
     justify-items: center;
-    gap: 8px;
+    gap: 2px;
+  }
+  .ll-pile .ll-lbl {
+    font-size: 11px;
   }
   .ll-slot {
     height: calc(var(--card-w-sm) * 1.4 + 6px);
+    min-width: calc(var(--card-w-sm) + 6px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -592,16 +646,11 @@ body {
   }
   .ll-stack .ll-back {
     position: absolute;
-    left: 0;
-    top: 6px;
   }
-  .ll-stack .ll-back:nth-child(2) {
-    left: 3px;
-    top: 3px;
-  }
-  .ll-stack .ll-back:nth-child(3) {
-    left: 6px;
-    top: 0;
+  .ll-stack.empty {
+    border: 1px dashed rgb(201 164 92 / 0.4);
+    border-radius: 4px;
+    box-sizing: border-box;
   }
   .ll-stack em {
     position: absolute;
@@ -618,13 +667,19 @@ body {
     font-size: 18px;
     text-shadow: 0 1px 4px #000;
   }
+  .ll-stack.empty em {
+    left: 3px;
+    top: 3px;
+    opacity: 0.55;
+  }
   .ll-turn {
     min-width: 0;
+    max-width: 380px;
     display: grid;
     align-content: center;
     justify-items: center;
-    gap: 2px;
-    padding: 10px 14px;
+    gap: 0;
+    padding: 6px 14px;
     text-align: center;
     font-family: var(--font-display);
     letter-spacing: 0.1em;
@@ -644,6 +699,7 @@ body {
     letter-spacing: 0;
     text-transform: none;
     font-size: 14px;
+    line-height: 1.25;
     color: var(--color-ivory);
     opacity: 0.8;
   }
@@ -656,40 +712,114 @@ body {
       gap: 8px;
     }
     .ll-turn {
-      padding: 8px 6px;
+      padding: 6px;
       letter-spacing: 0.06em;
       font-size: 13px;
     }
   }
   .ll-me {
-    grid-area: m;
     display: grid;
-    gap: 12px;
+    gap: 6px;
     justify-items: center;
-    padding-top: 6px;
+    align-content: center;
+    min-height: 0;
+    overflow: auto;
+  }
+  .ll-handzone {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 12px 20px;
+  }
+  .ll-handzone .ll-mine {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 6px;
+    width: 220px;
+    max-width: 100%;
+    box-sizing: border-box;
+    text-align: left;
   }
   .ll-hand {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 14px;
+    gap: 12px;
     padding-top: 12px;
   }
   .ll-hand.wait {
     opacity: 0.55;
+  }
+  .ll-actbar {
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+    margin: 0 calc(-1 * clamp(12px, 2vw, 20px));
+    padding: 10px clamp(12px, 2vw, 20px) max(10px, env(safe-area-inset-bottom, 0px));
+    background: linear-gradient(rgb(43 14 27 / 0.92), var(--color-wine));
+    border-top: 1px solid rgb(201 164 92 / 0.35);
   }
   .ll-act {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     justify-content: center;
-    gap: 12px;
+    gap: 6px 12px;
   }
   .ll-act .hint {
     font-size: 15px;
     opacity: 0.85;
     flex: 1 1 220px;
     min-width: 0;
+    max-width: 640px;
+    text-align: center;
+  }
+  .ll-pile-sm {
+    display: none;
+  }
+
+  /* Escritorio y portátil: toda la mesa cabe en una pantalla, sin scroll de página. */
+  @media (min-width: 900px) and (min-height: 540px) {
+    .ll-game {
+      height: 100dvh;
+      min-height: 0;
+      overflow: hidden;
+    }
+    .ll-board {
+      grid-template-rows: minmax(0, 1fr);
+      height: 100%;
+      padding-bottom: 0;
+    }
+    .ll-main {
+      height: 100%;
+    }
+    .ll-actbar {
+      position: static;
+      margin: 8px 0 0;
+      padding: 8px 4px 10px;
+      background: none;
+      border-top: 0;
+    }
+    /* La carta grande escala con la altura que queda. */
+    .ll-game {
+      --card-w-lg: clamp(104px, calc((100dvh - 430px) * 0.714), 166px);
+    }
+  }
+  @media (min-width: 1200px) and (min-height: 540px) {
+    .ll-board {
+      grid-template-columns: minmax(0, 1fr) 232px;
+    }
+    .ll-guide {
+      align-self: stretch;
+      align-content: start;
+      max-height: 100%;
+      overflow: auto;
+      position: static;
+      width: auto;
+      margin-bottom: 10px;
+    }
   }
   .ll-logh {
     margin: 0;
@@ -1101,7 +1231,7 @@ body {
     z-index: 6;
     left: 10px;
     right: 10px;
-    bottom: calc(100% - 4px);
+    top: calc(100% - 6px);
     display: block;
     padding: 8px 12px;
     border-radius: 12px;
@@ -1116,13 +1246,10 @@ body {
     content: "";
     position: absolute;
     left: 22px;
-    bottom: -7px;
+    top: -7px;
     border: 7px solid transparent;
-    border-bottom: 0;
-    border-top-color: var(--color-ivory);
-  }
-  .ll-seat {
-    position: relative;
+    border-top: 0;
+    border-bottom-color: var(--color-ivory);
   }
   @media (prefers-reduced-motion: reduce) {
     .ll-card,

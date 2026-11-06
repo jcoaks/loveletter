@@ -6,8 +6,11 @@ import { DiscardsModal } from '../components/DiscardsModal';
 import { GuardModal } from '../components/GuessPicker';
 import { GuideModal } from '../components/GuideModal';
 import { HandRow } from '../components/HandRow';
+import { LogModal } from '../components/LogModal';
 import { PlayerPickerModal } from '../components/PlayerPickerModal';
+import { PlayNoticeModal } from '../components/PlayNoticeModal';
 import { ResultModal } from '../components/ResultModal';
+import { RulesModal } from '../components/RulesContent';
 import { MineBar } from '../components/SeatCard';
 import { TableLayout } from '../components/TableLayout';
 import { Toast } from '../components/Toast';
@@ -27,6 +30,9 @@ import { PauseOverlay } from './special/PauseOverlay';
 import { RoundOverModal } from './special/RoundOver';
 
 type Flow = 'picker' | 'guard' | 'confirm' | null;
+
+/** Los avisos que no te afectan se cierran solos tras este tiempo. */
+const NOTICE_AUTO_MS = 5000;
 
 /** Resultados nuevos (tus jugadas y lo que otros te hacen), en cola. No repite lo ya visto al conectar. */
 function useResults(ctx: TextContext) {
@@ -77,6 +83,8 @@ export function GameScreen() {
   const dialog = useUiStore((s) => s.dialog);
   const openDialog = useUiStore((s) => s.openDialog);
   const closeDialog = useUiStore((s) => s.closeDialog);
+  const noticeMode = useUiStore((s) => s.noticeMode);
+  const setNoticeMode = useUiStore((s) => s.setNoticeMode);
 
   const [selected, setSelected] = useState<CardValue | null>(null);
   const [flow, setFlow] = useState<Flow>(null);
@@ -86,6 +94,8 @@ export function GameScreen() {
   const [seatInfo, setSeatInfo] = useState<string | null>(null);
   const [submittedAt, setSubmittedAt] = useState<number | null>(null);
   const [endHidden, setEndHidden] = useState(false);
+  const [logOpen, setLogOpen] = useState(false);
+  const [readCount, setReadCount] = useState<number | null>(null);
 
   const ctx = useMemo<TextContext>(
     () => ({
@@ -99,10 +109,21 @@ export function GameScreen() {
   const current = results.queue[0];
 
   const revealKeys = useMemo(() => results.queue.map((r) => r.key), [results.queue]);
-  const modalOpen = Boolean(flow) || Boolean(current) || seatInfo !== null || dialog !== null;
+  const modalOpen =
+    Boolean(flow) || Boolean(current) || seatInfo !== null || dialog !== null || logOpen;
   const speech = useBotSpeech(room.chat, modalOpen, revealKeys);
   const busy = results.queue.length > 0 || speech.pending || Object.keys(speech.speech).length > 0;
   useTableReady(game, busy);
+
+  // Avisos breves: los que no te afectan se cierran solos.
+  const briefKey =
+    current?.other && noticeMode === 'brief' && !current.other.affectsMe ? current.key : null;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: solo cuenta el aviso en pantalla
+  useEffect(() => {
+    if (!briefKey) return;
+    const timer = window.setTimeout(results.dismiss, NOTICE_AUTO_MS);
+    return () => window.clearTimeout(timer);
+  }, [briefKey]);
 
   // Una vista nueva libera el botón de jugar.
   const eventCount = game.events.length;
@@ -177,6 +198,15 @@ export function GameScreen() {
   const restCard = lp && hand.length === 2 ? hand[hand.indexOf(lp.card) === 0 ? 1 : 0] : undefined;
   const log = useMemo(() => chronicle(game.events, ctx), [game.events, ctx]);
   const toWin = game.tokensToWin;
+  // Con el registro abierto todo cuenta como leído.
+  useEffect(() => {
+    if (logOpen) setReadCount(log.length);
+  }, [logOpen, log.length]);
+
+  const initialLog = useRef<number | null>(null);
+  if (initialLog.current === null) initialLog.current = log.length;
+  const baseline = readCount ?? initialLog.current;
+  const unread = logOpen ? 0 : Math.max(0, log.length - baseline);
   const seatShown = seatInfo ? [seats.me, ...seats.rivals].find((s) => s.id === seatInfo) : null;
   const chancellorView = game.phase === 'chancellor' ? game.chancellor : null;
   const showEnd = !current && !endHidden;
@@ -191,90 +221,161 @@ export function GameScreen() {
     return m;
   }, [game.events]);
 
+  const pickedId = current?.other?.targetId ?? null;
+  const allMarks =
+    pickedId && pickedId !== game.you.id ? { ...marks, [pickedId]: 'picked' as const } : marks;
+
+  const actions =
+    myPlayTurn && lp ? (
+      <div className="ll-act">
+        <button
+          type="button"
+          className="ll-play"
+          disabled={!lp.playable || !ready}
+          aria-describedby="act-hint"
+          onClick={startPlay}
+        >
+          Jugar {cardName(lp.card)}
+        </button>
+        <span className="hint" id="act-hint">
+          {hint}
+        </span>
+      </div>
+    ) : game.isMyTurn && chancellorView ? (
+      <div className="ll-act">
+        <button type="button" className="ll-play" onClick={() => setChancellorOpen(true)}>
+          Elegir con el Canciller
+        </button>
+      </div>
+    ) : game.phase === 'round_over' && endHidden ? (
+      <div className="ll-act">
+        <button type="button" className="ll-play" onClick={() => setEndHidden(false)}>
+          Ver el resumen
+        </button>
+      </div>
+    ) : (
+      <div className="ll-act wait">
+        <span className="hint">
+          {game.phase === 'turn' || game.phase === 'chancellor'
+            ? `${text}… No puedes jugar hasta tu turno.`
+            : text}
+        </span>
+      </div>
+    );
+
   return (
     <>
       <div role="status" aria-live="polite" className="sr-only-ll">
-        {current ? `${current.title} ${current.body}` : text}
+        {current ? `${current.title}. ${current.body}` : text}
       </div>
-      <TableLayout
-        rivals={seats.rivals}
-        toWin={toWin}
-        deckCount={game.deckSize}
-        setAside={{ hidden: game.hasSetAside ? 1 : 0, faceUp: game.faceUp }}
-        turn={
-          <TurnBanner
-            round={game.round}
-            text={text}
-            toWin={toWin}
-            mine={game.isMyTurn}
-            extra={status === 'open' ? undefined : '● reconectando…'}
-          />
-        }
-        marks={marks}
-        log={log}
-        speech={speech.speech}
-        onOpenSeat={setSeatInfo}
-        onOpenGuide={() => openDialog('guide')}
-        mine={
-          <>
-            <span className="ll-lbl priv">Tu mano · solo tú la ves</span>
-            <HandRow
-              hand={hand}
-              selected={myPlayTurn ? sel : null}
-              onSelect={myPlayTurn ? setSelected : undefined}
-              disabled={!ready}
-              waiting={!myPlayTurn}
-              lockedValues={lockedValues}
-            />
-            {myPlayTurn && lp ? (
-              <div className="ll-act">
-                <button
-                  type="button"
-                  className="ll-play"
-                  disabled={!lp.playable || !ready}
-                  aria-describedby="act-hint"
-                  onClick={startPlay}
-                >
-                  Jugar {cardName(lp.card)}
-                </button>
-                <span className="hint" id="act-hint">
-                  {hint}
-                </span>
-              </div>
-            ) : game.isMyTurn && chancellorView ? (
-              <div className="ll-act">
-                <button type="button" className="ll-play" onClick={() => setChancellorOpen(true)}>
-                  Elegir con el Canciller
-                </button>
-              </div>
-            ) : game.phase === 'round_over' && endHidden ? (
-              <div className="ll-act">
-                <button type="button" className="ll-play" onClick={() => setEndHidden(false)}>
-                  Ver el resumen
-                </button>
-              </div>
-            ) : (
-              <div className="ll-act wait">
-                <span className="hint">
-                  {game.phase === 'turn' || game.phase === 'chancellor'
-                    ? `${text}… No puedes jugar hasta tu turno.`
-                    : text}
-                </span>
-              </div>
+      <div className="ll-game">
+        <div className="ll-bar" role="toolbar" aria-label="Opciones de la partida">
+          <button type="button" className="ll-ghost" onClick={() => openDialog('rules')}>
+            Reglas
+          </button>
+          <button
+            type="button"
+            className="ll-ghost"
+            onClick={() => {
+              setReadCount(log.length);
+              setLogOpen(true);
+            }}
+          >
+            Registro
+            {unread > 0 && (
+              <span className="ll-badge" role="img" aria-label={`${unread} sin leer`}>
+                {unread}
+              </span>
             )}
-            <MineBar seat={seats.me} toWin={toWin} onOpen={() => setSeatInfo(game.you.id)}>
-              {game.isMyTurn && !seats.me.eliminated && <i className="ll-chip on">Tu turno</i>}
-            </MineBar>
-          </>
-        }
-      />
+          </button>
+          <button type="button" className="ll-ghost ll-hide-lg" onClick={() => openDialog('guide')}>
+            Carta guía
+          </button>
+          <button
+            type="button"
+            className="ll-ghost"
+            role="switch"
+            aria-label={`Avisos de jugadas: ${noticeMode === 'full' ? 'completos' : 'breves'}`}
+            aria-checked={noticeMode === 'full'}
+            onClick={() => setNoticeMode(noticeMode === 'full' ? 'brief' : 'full')}
+          >
+            Avisos<span className="ll-hide-sm"> de jugadas</span>:{' '}
+            {noticeMode === 'full' ? 'completos' : 'breves'}
+          </button>
+          <button type="button" className="ll-ghost" onClick={() => openDialog('leave')}>
+            Salir
+          </button>
+        </div>
+        <TableLayout
+          rivals={seats.rivals}
+          toWin={toWin}
+          deckCount={game.deckSize}
+          setAside={{ hidden: game.hasSetAside ? 1 : 0, faceUp: game.faceUp }}
+          turn={
+            <TurnBanner
+              round={game.round}
+              text={text}
+              toWin={toWin}
+              mine={game.isMyTurn}
+              extra={status === 'open' ? undefined : '● reconectando…'}
+            />
+          }
+          marks={allMarks}
+          speech={speech.speech}
+          onOpenSeat={setSeatInfo}
+          onOpenGuide={() => openDialog('guide')}
+          actions={actions}
+          mine={
+            <>
+              <span className="ll-lbl priv">Tu mano · solo tú la ves</span>
+              <div className="ll-handzone">
+                <HandRow
+                  hand={hand}
+                  selected={myPlayTurn ? sel : null}
+                  onSelect={myPlayTurn ? setSelected : undefined}
+                  disabled={!ready}
+                  waiting={!myPlayTurn}
+                  lockedValues={lockedValues}
+                />
+                <MineBar seat={seats.me} toWin={toWin} onOpen={() => setSeatInfo(game.you.id)}>
+                  {game.isMyTurn && !seats.me.eliminated && <i className="ll-chip on">Tu turno</i>}
+                </MineBar>
+              </div>
+            </>
+          }
+        />
+      </div>
+
+      {logOpen && <LogModal entries={log} onClose={() => setLogOpen(false)} />}
+      {dialog === 'rules' && <RulesModal onClose={closeDialog} />}
+
+      {/* Jugada de otro jugador: ventana completa o aviso breve según la preferencia. */}
+      {current?.other && noticeMode === 'full' && (
+        <PlayNoticeModal
+          notice={current}
+          actorName={ctx.name(current.other.actorId)}
+          targetName={
+            current.other.targetId
+              ? current.other.targetId === game.you.id
+                ? 'Ti'
+                : ctx.name(current.other.targetId)
+              : null
+          }
+          autoCloseMs={current.other.affectsMe ? null : NOTICE_AUTO_MS}
+          onContinue={results.dismiss}
+        />
+      )}
 
       {/* Resultado de tu jugada: ventana si importa, aviso si es trivial. */}
       <Toast
-        message={current?.style === 'toast' ? { title: current.title, body: current.body } : null}
+        message={
+          current && (current.style === 'toast' || (current.other && noticeMode === 'brief'))
+            ? { title: current.title, body: current.body }
+            : null
+        }
         onDismiss={results.dismiss}
       />
-      {current?.style === 'modal' && (
+      {current?.style === 'modal' && !current.other && (
         <ResultModal
           label={current.label}
           title={current.title}

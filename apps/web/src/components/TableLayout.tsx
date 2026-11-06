@@ -6,21 +6,35 @@ import { GuidePanel } from './GuidePanel';
 import { LogPanel } from './LogPanel';
 import { SeatCard, type SeatMark } from './SeatCard';
 
-function DeckStack({ count }: { count: number }) {
+/** Mazo: tantas cartas apiladas como queden (hasta 3); vacío, un hueco con el 0. Caja de tamaño fijo. */
+export function DeckStack({ count }: { count: number }) {
+  const layers = Math.min(3, Math.max(0, count));
   return (
-    <div className="ll-stack" role="img" aria-label={`Mazo: ${count} cartas`}>
-      <CardBack />
-      <CardBack />
-      <CardBack />
+    <div
+      className={`ll-stack${layers === 0 ? ' empty' : ''}`}
+      role="img"
+      aria-label={`Mazo: ${count} ${count === 1 ? 'carta' : 'cartas'}`}
+    >
+      {Array.from({ length: layers }, (_, k) => {
+        // La carta de arriba siempre en la misma posición, donde va el contador.
+        const slot = k + (3 - layers);
+        return (
+          <CardBack
+            // biome-ignore lint/suspicious/noArrayIndexKey: reversos idénticos
+            key={k}
+            style={{ left: slot * 3, top: (2 - slot) * 3 }}
+          />
+        );
+      })}
       <em aria-hidden="true">{count}</em>
     </div>
   );
 }
 
 /**
- * Mesa: laterales + fila superior + centro (mazo / turno / apartada) + mano propia, con la
- * carta guía a la derecha desde 1200 px. Reparte de 0 a 5 rivales: 1 arriba; 2 a los lados;
- * 3 o más, primero a la izquierda, último a la derecha y el resto arriba.
+ * Mesa compacta: rivales en una fila, centro (mazo / turno / apartada), tu mano con tus descartes
+ * al lado y, debajo, la barra de acciones. En escritorio todo cabe en `100dvh`; la carta guía
+ * va a la derecha desde 1200 px.
  */
 export function TableLayout({
   rivals,
@@ -29,6 +43,7 @@ export function TableLayout({
   setAside,
   turn,
   mine,
+  actions,
   log,
   marks,
   onOpenSeat,
@@ -43,41 +58,36 @@ export function TableLayout({
   setAside: { hidden: number; faceUp: readonly CardValue[] };
   /** Bloque central de turno (normalmente un `TurnBanner`). */
   turn: ReactNode;
-  /** Mano propia, acciones y franja de descartes. */
+  /** Tu mano y tus descartes. */
   mine: ReactNode;
-  log: readonly string[];
+  /** Barra de acciones (siempre visible bajo la mesa). */
+  actions?: ReactNode;
+  /** Registro en línea (opcional: en la partida va en un panel aparte). */
+  log?: readonly string[];
   marks?: Record<string, SeatMark>;
   onOpenSeat?: (id: string) => void;
   onOpenGuide?: () => void;
   /** Frases de bots en pantalla, por id de jugador. */
   speech?: Record<string, string>;
-  /** Overlays (avisos, etc.). Las ventanas modales van en su propio portal. */
   children?: ReactNode;
 }) {
-  const few = rivals.length <= 1;
-  const sides = few ? [] : [rivals[0], rivals[rivals.length - 1]];
-  const top = few ? rivals : rivals.slice(1, -1);
-  const [left, right] = sides;
-  const seat = (s: SeatData, position: 'left' | 'right' | '') => (
-    <SeatCard
-      key={s.id}
-      seat={s}
-      toWin={toWin}
-      position={position}
-      mark={marks?.[s.id]}
-      speech={speech?.[s.id]}
-      onOpen={onOpenSeat ? () => onOpenSeat(s.id) : undefined}
-    />
-  );
   const aside = setAside.hidden + setAside.faceUp.length;
-
   return (
     <section className="ll-board" aria-label="Mesa de juego">
       <div className="ll-main">
-        <div className={`ll-table${few ? ' few' : ''}${rivals.length === 2 ? ' notop' : ''}`}>
-          {top.length > 0 && <div className="ll-toprow">{top.map((s) => seat(s, ''))}</div>}
-          {left && seat(left, 'left')}
-          {right && seat(right, 'right')}
+        <div className="ll-table">
+          <div className="ll-rivals" data-count={rivals.length}>
+            {rivals.map((s) => (
+              <SeatCard
+                key={s.id}
+                seat={s}
+                toWin={toWin}
+                mark={marks?.[s.id]}
+                speech={speech?.[s.id]}
+                onOpen={onOpenSeat ? () => onOpenSeat(s.id) : undefined}
+              />
+            ))}
+          </div>
           <div className="ll-center">
             <div className="ll-pile">
               <div className="ll-slot">
@@ -106,7 +116,8 @@ export function TableLayout({
           </div>
           <div className="ll-me">{mine}</div>
         </div>
-        <LogPanel entries={log} />
+        {actions && <div className="ll-actbar">{actions}</div>}
+        {log && <LogPanel entries={log} />}
       </div>
       {onOpenGuide && <GuidePanel onOpen={onOpenGuide} />}
       {children}

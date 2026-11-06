@@ -1,6 +1,6 @@
 import type { CardValue, GameEvent } from '@loveletter/engine';
 import { cardName, withArticle } from './cards';
-import { type EventGroup, groupEvents, groupText, type TextContext } from './chronicle';
+import { type EventGroup, groupEvents, playText, type TextContext } from './chronicle';
 
 export interface ResultFace {
   caption: string;
@@ -19,6 +19,14 @@ export interface TableResult {
   visibility: 'private' | 'public';
   /** Alguien quedó fuera. */
   hit: boolean;
+  /** Presente cuando es la jugada de otro jugador (aviso informativo). */
+  other?: {
+    actorId: string;
+    card: CardValue;
+    targetId: string | null;
+    /** Eres el objetivo o quedas fuera: espera a que pulses Continuar. */
+    affectsMe: boolean;
+  };
 }
 
 export interface ChancellorPick {
@@ -227,6 +235,60 @@ function mineResult(
   }
 }
 
+/** Aviso de la jugada de otro: solo lo que tu vista permite saber (`secret` solo si va para ti). */
+function otherNotice(group: Extract<EventGroup, { kind: 'play' }>, ctx: TextContext): TableResult {
+  const { play, effects } = group;
+  const me = ctx.me;
+  const actor = play.playerId;
+  const nm = ctx.name;
+  const targeted = effects.find((e) => 'targetId' in e) as
+    | (GameEvent & { targetId: string })
+    | undefined;
+  const targetId = targeted?.targetId ?? null;
+  const out = effects.some((e) => e.type === 'eliminated');
+  const meOut = effects.some((e) => e.type === 'eliminated' && e.playerId === me);
+  const faces: ResultFace[] = [];
+  let priv = false;
+  const king = find(effects, 'king');
+  const baron = find(effects, 'baron');
+  const prince = find(effects, 'prince');
+  if (king?.secret?.hands && (king.targetId === me || king.playerId === me)) {
+    const got = king.secret.hands[me];
+    const gave = king.secret.hands[king.targetId === me ? actor : king.targetId];
+    if (got !== undefined) {
+      priv = true;
+      faces.push({ caption: 'Recibes', value: got });
+      if (gave !== undefined) faces.push({ caption: `${nm(actor)} se queda`, value: gave });
+    }
+  }
+  if (baron?.secret?.hands && (baron.targetId === me || baron.playerId === me)) {
+    const mine = baron.secret.hands[me];
+    const theirs = baron.secret.hands[actor];
+    if (mine !== undefined && theirs !== undefined) {
+      faces.push({ caption: 'Tu mano', value: mine }, { caption: nm(actor), value: theirs });
+    }
+  }
+  if (prince && prince.targetId === me) {
+    faces.push({ caption: 'Descartas', value: prince.discarded });
+    const fresh = find(effects, 'draw')?.secret?.drawn?.[0];
+    if (fresh !== undefined) {
+      priv = true;
+      faces.push({ caption: 'Nueva', value: fresh });
+    }
+  }
+  return {
+    key: `ev-${play.id}`,
+    style: 'modal',
+    label: `Jugada de ${nm(actor)}: ${cardName(play.card)}`,
+    title: `${nm(actor)} jugó ${withArticle(play.card)}`,
+    body: playText(play, effects, ctx),
+    faces,
+    visibility: priv ? 'private' : 'public',
+    hit: out,
+    other: { actorId: actor, card: play.card, targetId, affectsMe: targetId === me || meOut },
+  };
+}
+
 /**
  * Resultados que hay que enseñar por los sucesos nuevos de la vista: tus propias jugadas (Canciller
  * incluido, con la elección que guardaste) y lo que otros te hacen con el Rey o el Barón.
@@ -244,13 +306,7 @@ export function buildResults(
         if (r) results.push(r);
         continue;
       }
-      const e = group.effects.find((x) => x.type === 'king' || x.type === 'baron');
-      if (e && 'targetId' in e && e.targetId === ctx.me) {
-        const text = groupText(group, ctx);
-        if (text) {
-          results.push(toast(`ev-${group.play.id}`, 'Jugada contra ti', 'Te eligieron.', text));
-        }
-      }
+      results.push(otherNotice(group, ctx));
       continue;
     }
     const e = group.event;

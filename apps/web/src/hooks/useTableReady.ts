@@ -3,8 +3,8 @@ import { tableMoment } from '@loveletter/protocol';
 import { useEffect, useRef } from 'react';
 import { useRoomStore } from '../store/room';
 
-/** Todo debe estar en calma este tiempo antes de dar el suceso por visto. */
-const SETTLE_MS = 800;
+/** Pausa mínima tras cerrarse el último aviso o frase, antes de dar el suceso por visto. */
+const SETTLE_MS = 200;
 
 /**
  * Avisa a la sala cuando esta pantalla terminó de mostrar lo ocurrido (resultados, frases de bots)
