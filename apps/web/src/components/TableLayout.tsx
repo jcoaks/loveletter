@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import type { CardValue } from '../lib/cards';
 import type { SeatData } from '../lib/seat';
+import { BubbleLayer } from './BubbleLayer';
 import { CardBack, CardFan } from './Card';
 import { GuidePanel } from './GuidePanel';
 import { LogPanel } from './LogPanel';
@@ -83,7 +84,6 @@ export function TableLayout({
                 seat={s}
                 toWin={toWin}
                 mark={marks?.[s.id]}
-                speech={speech?.[s.id]}
                 onOpen={onOpenSeat ? () => onOpenSeat(s.id) : undefined}
               />
             ))}
@@ -119,6 +119,12 @@ export function TableLayout({
         {actions && <div className="ll-actbar">{actions}</div>}
         {log && <LogPanel entries={log} />}
       </div>
+      {speech && (
+        <BubbleLayer
+          speech={speech}
+          names={Object.fromEntries(rivals.map((r) => [r.id, r.name]))}
+        />
+      )}
       {onOpenGuide && <GuidePanel onOpen={onOpenGuide} />}
       {children}
     </section>

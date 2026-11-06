@@ -173,6 +173,7 @@ export function startRound(state: GameState, random: Random, starterId: PlayerId
   const deck = shuffle(buildDeck(), random);
   state.round += 1;
   state.setAside = deck.shift() as CardValue;
+  state.originalSetAside = state.setAside;
   state.faceUp = state.players.length === 2 ? deck.splice(0, 3) : [];
   state.hands = {};
   state.discards = {};
@@ -256,6 +257,7 @@ function finishRound(state: GameState): void {
           alive.map((id) => [id, (state.hands[id] as CardValue[])[0] as CardValue]),
         ),
     discardTotals,
+    setAside: state.originalSetAside,
     awarded,
     tokens: { ...state.tokens },
     gameWinnerIds,
@@ -347,7 +349,7 @@ function playCard(
 
   removeFromHand(state, playerId, card);
   discard(state, playerId, card);
-  emit(state, { type: 'play', playerId, card, forced });
+  emit(state, { type: 'play', playerId, card }, forced ? { to: [playerId], forced: true } : undefined);
 
   if (needsTarget(card) && targetId === null) {
     emit(state, { type: 'no_effect', playerId, card, reason: 'no_targets' });

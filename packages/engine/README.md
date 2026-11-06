@@ -50,7 +50,7 @@ Con todos los jugadores confirmados se reparte la ronda siguiente automáticamen
   - `baron`: ambos ven las dos manos; públicamente solo `loserId`/`loserCard`.
   - `king`: ambos ven la mano que tienen DESPUÉS del intercambio (`secret.hands[id]`).
   - `chancellor`: solo el activo ve `secret.drawn`; los demás ven cuántas (`drawn: number`).
-- `summary` (`RoundSummary`, en `round_over`/`game_over`): `reason` (`last_standing` | `highest_hand` | `discard_tiebreak` | `shared_tie`), `winnerIds`, `spyBonusId`, `survivors`, `eliminated`, `revealedHands` (solo si se acabó el mazo), `discardTotals` (si hubo desempate), `awarded`, `tokens`, `gameWinnerIds`. `history` guarda las de rondas anteriores.
+- `summary` (`RoundSummary`, en `round_over`/`game_over`): `reason` (`last_standing` | `highest_hand` | `discard_tiebreak` | `shared_tie`), `winnerIds`, `spyBonusId`, `survivors`, `eliminated`, `revealedHands` (solo si se acabó el mazo), `discardTotals` (si hubo desempate), `setAside` (la carta apartada boca abajo, revelada solo al terminar la ronda; si un Príncipe la robó sigue siendo la original), `awarded`, `tokens`, `gameWinnerIds`. `history` guarda las de rondas anteriores.
 - `roundOver`: `{ ready, waitingFor, youReady }` para el botón "Continuar".
 - `winnerIds` al terminar la partida.
 

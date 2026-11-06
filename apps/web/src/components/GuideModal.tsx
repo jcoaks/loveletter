@@ -1,5 +1,4 @@
-import { BAG_ART, CARDS, TOKENS_TO_WIN } from '../lib/cards';
-import { CardIcon } from './icons';
+import { artUrl, BAG_ART, CARDS, TOKENS_TO_WIN } from '../lib/cards';
 import { Sheet } from './Sheet';
 
 export function GuideModal({ players, onClose }: { players?: number; onClose: () => void }) {
@@ -14,10 +13,15 @@ export function GuideModal({ players, onClose }: { players?: number; onClose: ()
       <ol className="ll-glist">
         {CARDS.map((c) => (
           <li key={c.value}>
-            <span className="gv">{c.value}</span>
-            <span className="gi">
-              <CardIcon value={c.value} />
-            </span>
+            <img
+              className="gcard"
+              src={artUrl(c.value, 'sm')}
+              alt={`${c.value}, ${c.name}`}
+              width={64}
+              height={90}
+              loading="lazy"
+              decoding="async"
+            />
             <div>
               <b>{c.name}</b> <i>×{c.copies}</i>
               <p>{c.text}</p>

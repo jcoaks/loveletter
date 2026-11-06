@@ -12,12 +12,9 @@ export function SeatCard({
   position = '',
   mark,
   onOpen,
-  speech,
 }: {
   seat: SeatData;
   toWin: number;
-  /** Frase de un bot en este momento (burbuja junto al asiento). */
-  speech?: string;
   /** Clase de posición en la mesa: `left`, `right` o vacío (fila superior). */
   position?: 'left' | 'right' | '';
   mark?: SeatMark;
@@ -29,12 +26,6 @@ export function SeatCard({
     .join(' ');
   const body = (
     <>
-      {speech && (
-        <span className="ll-bubble" role="status" aria-live="polite">
-          <span className="sr-only-ll">{seat.name} dice: </span>
-          {speech}
-        </span>
-      )}
       <span className="ll-hd">
         <b>{seat.name}</b>
         {seatChips(seat).map((c) => (
@@ -47,8 +38,11 @@ export function SeatCard({
         <span className="ll-backs">
           {!seat.eliminated &&
             Array.from({ length: seat.handCount }, (_, i) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: reversos idénticos
-              <CardBack key={i} />
+              <CardBack
+                // biome-ignore lint/suspicious/noArrayIndexKey: reversos idénticos
+                key={i}
+                className={i >= seat.handCount - (seat.hiddenBacks ?? 0) ? 'll-pending' : ''}
+              />
             ))}
         </span>
         <CardFan cards={seat.discards} />
@@ -62,13 +56,24 @@ export function SeatCard({
   if (!onOpen) {
     return (
       // biome-ignore lint/a11y/useSemanticElements: grupo con nombre accesible, no un formulario
-      <div className={cls} role="group" aria-label={seatLabel(seat, toWin, false)}>
+      <div
+        className={cls}
+        data-seat-id={seat.id}
+        role="group"
+        aria-label={seatLabel(seat, toWin, false)}
+      >
         {body}
       </div>
     );
   }
   return (
-    <button type="button" className={cls} onClick={onOpen} aria-label={seatLabel(seat, toWin)}>
+    <button
+      type="button"
+      className={cls}
+      data-seat-id={seat.id}
+      onClick={onOpen}
+      aria-label={seatLabel(seat, toWin)}
+    >
       {body}
     </button>
   );

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChancellorModal } from '../components/ChancellorModal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { DiscardsModal } from '../components/DiscardsModal';
+import { DrawLayer } from '../components/DrawLayer';
 import { GuardModal } from '../components/GuessPicker';
 import { GuideModal } from '../components/GuideModal';
 import { HandRow } from '../components/HandRow';
@@ -18,6 +19,7 @@ import { ToastStack } from '../components/ToastStack';
 import { TurnBanner } from '../components/TurnBanner';
 import { useCanAct, useGame, useRoom } from '../hooks/room';
 import { useBotSpeech } from '../hooks/useBotSpeech';
+import { useDraws } from '../hooks/useDraws';
 import { useTableReady } from '../hooks/useTableReady';
 import { CARD_BY_VALUE, cardName } from '../lib/cards';
 import { chronicle, type TextContext } from '../lib/chronicle';
@@ -119,7 +121,6 @@ export function GameScreen() {
     }),
     [game.you.id, game.players],
   );
-  const seats = useMemo(() => seatsOf(game, room), [game, room]);
   const results = useResults(ctx, noticeMode);
   const current = results.queue[0];
 
@@ -129,10 +130,20 @@ export function GameScreen() {
   );
   const modalOpen =
     Boolean(flow) || Boolean(current) || seatInfo !== null || dialog !== null || logOpen;
+  const draws = useDraws(game, modalOpen);
+  const baseSeats = useMemo(() => seatsOf(game, room), [game, room]);
+  const seats = useMemo(
+    () => ({
+      me: baseSeats.me,
+      rivals: baseSeats.rivals.map((r) => ({ ...r, hiddenBacks: draws.pending[r.id] ?? 0 })),
+    }),
+    [baseSeats, draws.pending],
+  );
   const speech = useBotSpeech(room.chat, modalOpen, revealKeys);
   const busy =
     results.queue.length > 0 ||
     results.toasts.length > 0 ||
+    draws.active ||
     speech.pending ||
     Object.keys(speech.speech).length > 0;
   useTableReady(game, busy);
@@ -369,6 +380,7 @@ export function GameScreen() {
                   disabled={!ready}
                   waiting={!myPlayTurn}
                   lockedValues={lockedValues}
+                  hideLast={draws.pending[game.you.id] ?? 0}
                 />
                 <MineBar seat={seats.me} toWin={toWin} onOpen={() => setSeatInfo(game.you.id)}>
                   {game.isMyTurn && !seats.me.eliminated && <i className="ll-chip on">Tu turno</i>}
@@ -379,6 +391,7 @@ export function GameScreen() {
         />
       </div>
 
+      <DrawLayer flights={draws.flights} onLand={draws.land} />
       {logOpen && <LogModal entries={log} onClose={() => setLogOpen(false)} />}
       {dialog === 'rules' && <RulesModal onClose={closeDialog} />}
 
@@ -446,7 +459,7 @@ export function GameScreen() {
           Si la descartas, quedas fuera de la ronda.
         </ConfirmDialog>
       )}
-      {chancellorView && game.isMyTurn && chancellorOpen && !current && (
+      {chancellorView && game.isMyTurn && chancellorOpen && !current && !draws.active && (
         <ChancellorModal
           options={chancellorView.hand}
           onCancel={() => setChancellorOpen(false)}

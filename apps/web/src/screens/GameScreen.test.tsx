@@ -354,13 +354,12 @@ describe('GameScreen: bots', () => {
     );
     const text = await screen.findByText('¡Qué mala suerte!', {}, { timeout: 3000 });
     const bubble = text.closest('.ll-bubble');
-    expect(bubble).toHaveAttribute('aria-live', 'polite');
+    // Capa propia fuera de los asientos: nada del tablero lo tapa ni le hereda opacidad.
+    expect(bubble?.closest('.ll-seat')).toBeNull();
+    expect(bubble?.parentElement).toHaveClass('ll-bubbles');
+    expect(bubble?.parentElement?.parentElement).toBe(document.body);
+    expect(bubble?.parentElement).toHaveAttribute('aria-live', 'polite');
     expect(bubble).toHaveTextContent('Carla dice:');
-    // Está dentro del asiento del bot que habla.
-    expect(bubble?.closest('.ll-seat')).toHaveAttribute(
-      'aria-label',
-      expect.stringContaining('Carla'),
-    );
   });
 });
 
@@ -679,5 +678,13 @@ describe('GameScreen: carta guía', () => {
     const g = within(screen.getByRole('dialog', { name: 'Carta guía' }));
     expect(g.queryByText(/quedan|a la vista/)).toBeNull();
     expect(g.getAllByText(/^×\d$/).length).toBe(10);
+    // Cada fila lleva la carta real con arte (nunca un icono) y su valor y nombre como alt.
+    const imgs = g.getAllByRole('img');
+    expect(imgs).toHaveLength(10);
+    expect(g.getByRole('img', { name: '3, Barón' })).toHaveAttribute(
+      'src',
+      '/assets/card-3-sm.webp',
+    );
+    expect(document.querySelector('.ll-glist svg')).toBeNull();
   });
 });

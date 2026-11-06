@@ -1,4 +1,4 @@
-import type { PlayerView, RoundSummary } from '@loveletter/engine';
+import type { CardValue, PlayerView, RoundSummary } from '@loveletter/engine';
 import { Card } from '../../components/Card';
 import { Sheet } from '../../components/Sheet';
 import { Tokens } from '../../components/Token';
@@ -15,6 +15,31 @@ export function summaryTitle(summary: RoundSummary, name: (id: string) => string
   const names = summary.winnerIds.map(name);
   if (summary.reason === 'shared_tie') return `Empate: ganan ${listNames(names)}`;
   return names.length > 1 ? `Ganan la ronda ${listNames(names)}` : `Gana la ronda ${names[0]}`;
+}
+
+/** La carta apartada al empezar la ronda, que gira de reverso a cara. */
+function SetAsideReveal({ value }: { value: CardValue }) {
+  return (
+    <section
+      aria-label="Carta apartada"
+      className="flex flex-wrap items-center justify-center gap-4 rounded-xl border border-gold/30 bg-black/20 p-3"
+    >
+      <div className="ll-faces big compact" data-n={1}>
+        <div className="ll-dwrap">
+          <div className="ll-flip">
+            <div className="ll-flip-in">
+              <span className="ll-flip-back" aria-hidden="true" />
+              <Card value={value} ariaLabel={`Carta apartada: ${cardName(value)}`} />
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="min-w-[160px] flex-1">
+        <h4 className="m-0 font-display text-lg tracking-wider">Carta apartada</h4>
+        <p className="m-0 mt-1 text-ivory/85">La que se apartó boca abajo al empezar la ronda</p>
+      </div>
+    </section>
+  );
 }
 
 /** Resumen de la ronda: ganador, motivo, manos reveladas, fichas y bonificación del Espía. */
@@ -37,6 +62,10 @@ export function RoundSummaryBody({ game, summary }: { game: PlayerView; summary:
             </div>
           ))}
         </div>
+      )}
+      {/* Falta en salas creadas antes de que el motor la guardara: entonces no se muestra nada. */}
+      {summary.setAside !== undefined && summary.setAside !== null && (
+        <SetAsideReveal value={summary.setAside} />
       )}
       {summary.discardTotals && (
         <p className="ll-lbl" style={{ margin: 0 }}>

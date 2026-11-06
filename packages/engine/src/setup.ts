@@ -37,6 +37,7 @@ export function createGame(options: GameOptions, random: Random): Result<GameSta
     activeId: null,
     deck: [],
     setAside: null,
+    originalSetAside: 0,
     faceUp: [],
     hands: {},
     discards: {},

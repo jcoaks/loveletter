@@ -1,3 +1,4 @@
+import { viewFor } from '@loveletter/engine';
 import { type ReactNode, useState } from 'react';
 import { Card, CardBack } from '../../components/Card';
 import { ChancellorModal } from '../../components/ChancellorModal';
@@ -15,6 +16,8 @@ import { Tokens } from '../../components/Token';
 import { TurnBanner } from '../../components/TurnBanner';
 import { CARDS, type CardValue, isLockedByCountess, TOKENS_TO_WIN } from '../../lib/cards';
 import type { SeatData } from '../../lib/seat';
+import { rig, step } from '../../test-utils';
+import { RoundOverModal } from '../special/RoundOver';
 
 const SEATS: SeatData[] = [
   { id: 'me', name: 'Tú', gender: 'm', handCount: 2, discards: [1], tokens: 1 },
@@ -81,6 +84,7 @@ type ModalKey =
   | 'chancellor'
   | 'confirm'
   | 'discards'
+  | 'round-over'
   | null;
 
 const Section = ({ title, children }: { title: string; children: ReactNode }) => (
@@ -89,6 +93,17 @@ const Section = ({ title, children }: { title: string; children: ReactNode }) =>
     {children}
   </section>
 );
+
+/** Vista real del motor al cerrar una ronda por mazo agotado (para ver la carta apartada). */
+function roundOverView() {
+  const state = step(rig({ hands: [[2, 3], [5], [4]], deck: [] }), {
+    type: 'play_card',
+    playerId: 'p0',
+    card: 2,
+    targetId: 'p1',
+  });
+  return viewFor(state, 'p0');
+}
 
 export function Gallery() {
   const [n, setN] = useState(4);
@@ -235,6 +250,7 @@ export function Gallery() {
               ['chancellor', 'Canciller'],
               ['confirm', 'Confirmar Princesa'],
               ['discards', 'Descartes'],
+              ['round-over', 'Fin de ronda'],
             ] as [Exclude<ModalKey, null>, string][]
           ).map(([k, label]) => (
             <button key={k} type="button" className="ll-ghost" onClick={() => setModal(k)}>
@@ -330,6 +346,9 @@ export function Gallery() {
         >
           Si la descartas, quedas fuera de la ronda.
         </ConfirmDialog>
+      )}
+      {modal === 'round-over' && (
+        <RoundOverModal game={roundOverView()} onContinue={close} onHide={close} />
       )}
       {modal === 'discards' && (
         <DiscardsModal name="Diego" discards={[2, 3, 1]} eliminated spyPlayed onClose={close} />

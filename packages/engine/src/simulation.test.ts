@@ -8,13 +8,14 @@ import { simulate } from './test-helpers';
 import type { GameState } from './types';
 import { viewFor } from './view';
 
-const FORBIDDEN_KEYS = ['hands', 'deck', 'setAside', 'secretHands'];
+const FORBIDDEN_KEYS = ['hands', 'deck', 'setAside', 'originalSetAside', 'secretHands'];
 
 function keysOf(value: unknown, into = new Set<string>()): Set<string> {
   if (Array.isArray(value)) for (const v of value) keysOf(v, into);
   else if (value && typeof value === 'object') {
     for (const [k, v] of Object.entries(value)) {
-      if (k === 'secret') continue; // addressed events are checked separately
+      // Addressed events are checked separately; summaries of finished rounds are public.
+      if (k === 'secret' || k === 'summary' || k === 'history') continue;
       into.add(k);
       keysOf(v, into);
     }
@@ -42,6 +43,12 @@ function checkViews(state: GameState, random: Random): void {
   for (const p of state.players) {
     const view = viewFor(state, p.id);
     const keys = keysOf(view);
+    if (state.phase === 'turn' || state.phase === 'chancellor') {
+      expect(view.summary).toBeNull();
+      expect(JSON.stringify(view.events.filter((e) => e.type !== 'round_end'))).not.toContain(
+        'setAside',
+      );
+    }
     for (const forbidden of FORBIDDEN_KEYS) expect(keys.has(forbidden)).toBe(false);
     // Private details only on events addressed to the viewer.
     for (const e of view.events) if (e.secret) expect(e.secret.to).toContain(p.id);

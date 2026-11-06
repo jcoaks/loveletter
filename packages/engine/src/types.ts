@@ -41,6 +41,8 @@ export interface RoundSummary {
   discardTotals: Record<PlayerId, number> | null;
   /** Tokens gained this round (winners and Spy bonus). */
   awarded: Record<PlayerId, number>;
+  /** The card that was set aside face down this round (revealed only once the round is over). */
+  setAside: CardValue;
   /** Token totals after this round. */
   tokens: Record<PlayerId, number>;
   /** Set when this round ended the game. */
@@ -57,12 +59,14 @@ export interface EventSecret {
    * AFTER the swap (each party sees the card it receives).
    */
   hands?: Record<PlayerId, CardValue>;
+  /** `play` only: the Countess was forced by the King/Prince in hand (secret: it reveals the hand). */
+  forced?: boolean;
 }
 
 export type EventBody =
   | { type: 'round_start'; starterId: PlayerId; faceUp: CardValue[] }
   | { type: 'draw'; playerId: PlayerId; reason: 'turn' | 'prince'; from: 'deck' | 'set_aside' }
-  | { type: 'play'; playerId: PlayerId; card: CardValue; forced: boolean }
+  | { type: 'play'; playerId: PlayerId; card: CardValue }
   | {
       type: 'no_effect';
       playerId: PlayerId;
@@ -114,6 +118,8 @@ export interface GameState {
   deck: CardValue[];
   /** Face-down card set aside at the start of the round (null once a Prince drew it). */
   setAside: CardValue | null;
+  /** The card set aside at the start of the round, kept even after a Prince draws it. Never in views. */
+  originalSetAside: CardValue;
   /** Face-up removed cards (2 players only), visible to everyone. */
   faceUp: CardValue[];
   hands: Record<PlayerId, CardValue[]>;

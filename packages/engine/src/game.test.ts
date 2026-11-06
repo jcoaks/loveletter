@@ -4,6 +4,7 @@ import { seededRandom } from './random';
 import type { CardValue } from './rules';
 import { act, errorOf, eventsOf, play, rig } from './test-helpers';
 import type { Action } from './types';
+import { viewFor } from './view';
 
 const keep = (playerId: string, k: CardValue, bottomOrder: CardValue[]): Action => ({
   type: 'chancellor_keep',
@@ -68,7 +69,7 @@ describe('Condesa forzada', () => {
     const s = rig({ hands: [[8, 7], [3], [2]] });
     expect(errorOf(s, play(s, 'p0', 7, 'p1'))).toBe('countess_forced');
     const next = act(s, play(s, 'p0', 8));
-    expect(eventsOf(next, 'play')[0]).toMatchObject({ card: 8, forced: true });
+    expect(eventsOf(next, 'play')[0]).toMatchObject({ card: 8, secret: { to: ['p0'], forced: true } });
   });
 
   it('con el Príncipe también', () => {
@@ -518,5 +519,46 @@ describe('aleatoriedad inyectada', () => {
     const a = applyAction(s, { type: 'continue_round', playerId: 'p0' }, seededRandom(5));
     const b = applyAction(s, { type: 'continue_round', playerId: 'p0' }, seededRandom(5));
     expect(a).toEqual(b);
+  });
+});
+
+describe('carta apartada al final de la ronda', () => {
+  it('el resumen la revela en los 4 modos de fin de ronda', () => {
+    const last = rig({ hands: [[1, 5], [3]], setAside: 6 });
+    last.originalSetAside = 6;
+    expect(act(last, play(last, 'p0', 1, 'p1', 3)).summary?.setAside).toBe(6);
+    const modes: [ReturnType<typeof rig>, string][] = [
+      [rig({ hands: [[4, 5], [3], [7]], deck: [] }), 'highest_hand'],
+      [rig({ hands: [[2, 5], [5], [3]], deck: [], discards: { 1: [6, 4] } }), 'discard_tiebreak'],
+      [rig({ hands: [[2, 5], [5], [3]], deck: [], discards: { 0: [1, 1], 1: [4] } }), 'shared_tie'],
+    ];
+    for (const [s0, reason] of modes) {
+      s0.originalSetAside = 8;
+      const s = act(s0, s0.hands.p0?.includes(4) ? play(s0, 'p0', 4) : play(s0, 'p0', 2, 'p1'));
+      expect(s.summary?.reason).toBe(reason);
+      expect(s.summary?.setAside).toBe(8);
+      expect(s.history[0]?.setAside).toBe(8);
+    }
+  });
+
+  it('si un Príncipe la robó, el resumen muestra la original; la siguiente ronda tiene otra', () => {
+    const s0 = rig({ hands: [[5, 2], [1], [3]], deck: [], setAside: 7, bots: 3 });
+    s0.originalSetAside = 7;
+    const s = act(s0, play(s0, 'p0', 5, 'p1'));
+    expect(s.setAside).toBeNull();
+    expect(s.summary?.setAside).toBe(7);
+    expect(viewFor(s, 'p2').summary?.setAside).toBe(7);
+    const n = act(s, { type: 'continue_round', playerId: 'p0' });
+    expect(n.round).toBe(2);
+    expect(n.setAside).not.toBeNull();
+    expect(n.summary).toBeNull();
+    expect(viewFor(n, 'p1').summary).toBeNull();
+    expect(n.history[0]?.setAside).toBe(7);
+  });
+
+  it('durante el juego la vista no la expone', () => {
+    const s = rig({ hands: [[1, 5], [3]], setAside: 6 });
+    expect(JSON.stringify(viewFor(s, 'p0'))).not.toContain('etAside":6');
+    expect(viewFor(s, 'p0').hasSetAside).toBe(true);
   });
 });

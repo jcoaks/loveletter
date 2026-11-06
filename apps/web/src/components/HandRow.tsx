@@ -10,6 +10,7 @@ export function HandRow({
   waiting = false,
   emptyText = 'Sin cartas: quedaste fuera de la ronda',
   lockedValues,
+  hideLast = 0,
 }: {
   hand: readonly CardValue[];
   selected?: CardValue | null;
@@ -20,6 +21,8 @@ export function HandRow({
   emptyText?: string;
   /** Valores bloqueados según el motor (`legalPlays`); sin esto se deduce de la Condesa. */
   lockedValues?: ReadonlySet<CardValue>;
+  /** Las últimas N cartas todavía vuelan hacia la mano: su hueco queda reservado pero invisible. */
+  hideLast?: number;
 }) {
   return (
     <div className={`ll-hand${waiting ? ' wait' : ''}`}>
@@ -32,6 +35,7 @@ export function HandRow({
             key={`${i}-${v}`}
             value={v}
             eager
+            className={i >= hand.length - hideLast ? 'll-pending' : ''}
             selected={selected === v}
             locked={lockedValues ? lockedValues.has(v) : isLockedByCountess(hand, v)}
             disabled={disabled}

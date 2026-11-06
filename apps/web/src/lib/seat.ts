@@ -19,6 +19,8 @@ export interface SeatData {
   connected?: boolean;
   bot?: boolean;
   isTurn?: boolean;
+  /** Reversos que aún reciben una carta en vuelo: ocupan su sitio pero no se ven. */
+  hiddenBacks?: number;
 }
 
 export interface SeatChip {
