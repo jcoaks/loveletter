@@ -399,11 +399,13 @@ export function GameScreen() {
       {current?.other && (
         <PlayNoticeModal
           notice={current}
-          actorName={ctx.name(current.other.actorId)}
+          actorName={current.other.actorId === game.you.id ? 'Tú' : ctx.name(current.other.actorId)}
           targetName={
             current.other.targetId
               ? current.other.targetId === game.you.id
-                ? 'Ti'
+                ? current.other.actorId === game.you.id
+                  ? 'Tú mismo'
+                  : 'Ti'
                 : ctx.name(current.other.targetId)
               : null
           }

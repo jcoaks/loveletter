@@ -673,6 +673,8 @@ function botsReact(data: RoomData, before: GameState, ctx: RoomContext): void {
       if (said >= REMARKS_PER_EVENT) break;
       if (!remark || spoken.has(remark.text)) continue;
       say(data, seat.id, remark.text, key);
+      // The bot remembers what it said, so it does not repeat itself in later turns.
+      data.botNotes = { ...data.botNotes, [seat.id]: remark.notes };
       spoken.add(remark.text);
       said++;
     }

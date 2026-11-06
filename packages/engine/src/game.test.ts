@@ -69,7 +69,10 @@ describe('Condesa forzada', () => {
     const s = rig({ hands: [[8, 7], [3], [2]] });
     expect(errorOf(s, play(s, 'p0', 7, 'p1'))).toBe('countess_forced');
     const next = act(s, play(s, 'p0', 8));
-    expect(eventsOf(next, 'play')[0]).toMatchObject({ card: 8, secret: { to: ['p0'], forced: true } });
+    expect(eventsOf(next, 'play')[0]).toMatchObject({
+      card: 8,
+      secret: { to: ['p0'], forced: true },
+    });
   });
 
   it('con el Príncipe también', () => {

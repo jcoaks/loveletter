@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { cardName } from '../lib/cards';
-import type { TableResult } from '../lib/results';
+import type { ResultFace, TableResult } from '../lib/results';
 import { Card } from './Card';
 import { Sheet } from './Sheet';
 
@@ -12,6 +12,19 @@ function prefersReducedMotion(): boolean {
   } catch {
     return false;
   }
+}
+
+function FaceRow({ faces }: { faces: readonly ResultFace[] }) {
+  return (
+    <div className="ll-faces big compact" data-n={faces.length}>
+      {faces.map((f) => (
+        <div key={`${f.caption}-${f.value}`} className="ll-dwrap">
+          <Card value={f.value} ariaLabel={`${f.caption}: ${cardName(f.value)}`} />
+          <span className="ll-lbl">{f.caption}</span>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 /**
@@ -75,7 +88,7 @@ export function PlayNoticeModal({
           <i className="ll-chip">
             {notice.visibility === 'private' ? 'Solo tú lo ves' : 'Público'}
           </i>{' '}
-          {other.affectsMe ? 'Te afecta' : 'Jugada de otro jugador'}
+          {other.affectsMe ? 'Te afecta' : 'Jugada'}
         </>
       }
       tone={notice.hit ? 'hit' : 'default'}
@@ -109,15 +122,12 @@ export function PlayNoticeModal({
             </p>
           </div>
         </div>
-        {notice.faces.length > 0 && (
-          <div className="ll-faces big compact" data-n={notice.faces.length}>
-            {notice.faces.map((f) => (
-              <div key={`${f.caption}-${f.value}`} className="ll-dwrap">
-                <Card value={f.value} ariaLabel={`${f.caption}: ${cardName(f.value)}`} />
-                <span className="ll-lbl">{f.caption}</span>
-              </div>
-            ))}
-          </div>
+        {notice.faces.length > 0 && <FaceRow faces={notice.faces} />}
+        {notice.secretFaces && notice.secretFaces.length > 0 && (
+          <section aria-label="Solo tú lo ves" className="grid justify-items-center gap-2">
+            <i className="ll-chip">Solo tú lo ves</i>
+            <FaceRow faces={notice.secretFaces} />
+          </section>
         )}
         <div className="ll-row2">
           {autoCloseMs !== null && (

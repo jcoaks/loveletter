@@ -19,6 +19,8 @@ export interface TableResult {
   visibility: 'private' | 'public';
   /** Alguien quedó fuera. */
   hit: boolean;
+  /** Lo que solo tú ves de esta jugada (Sacerdote, Rey, Barón, Príncipe sobre ti). */
+  secretFaces?: ResultFace[];
   /** Presente cuando es la jugada de otro jugador (aviso informativo). */
   other?: {
     actorId: string;
@@ -42,255 +44,79 @@ function find<T extends GameEvent['type']>(
   return effects.find((e) => e.type === type) as Extract<GameEvent, { type: T }> | undefined;
 }
 
-function toast(key: string, label: string, title: string, body: string): TableResult {
-  return { key, style: 'toast', label, title, body, faces: [], visibility: 'public', hit: false };
-}
-
-function mineResult(
-  group: Extract<EventGroup, { kind: 'play' }>,
-  ctx: TextContext,
-): TableResult | null {
-  const { play, effects } = group;
-  const me = ctx.me;
-  const key = `ev-${play.id}`;
-  const label = `Resultado: ${cardName(play.card)}`;
-  const nm = (id: string) => ctx.name(id);
-  const modal = (
-    title: string,
-    body: string,
-    visibility: 'private' | 'public',
-    faces: ResultFace[] = [],
-    hit = false,
-  ): TableResult => ({ key, style: 'modal', label, title, body, faces, visibility, hit });
-
-  if (find(effects, 'no_effect')?.reason === 'no_targets') {
-    return toast(
-      key,
-      label,
-      'Sin efecto',
-      `Jugaste ${withArticle(play.card)} sin efecto: todos los demás están protegidos o eliminados.`,
-    );
-  }
-  switch (play.card) {
-    case 0:
-      return toast(
-        key,
-        label,
-        'Espía jugado',
-        'Jugaste el Espía. Si al cerrar la ronda eres el único con un Espía, ganas una ficha.',
-      );
-    case 1: {
-      const g = find(effects, 'guess');
-      if (!g) return null;
-      const t = nm(g.targetId);
-      return g.correct
-        ? modal(
-            '¡Acertaste!',
-            `${t} tenía ${withArticle(g.guess)}. Muestra su carta y queda fuera de la ronda.`,
-            'public',
-            [],
-            true,
-          )
-        : modal(
-            'Fallaste.',
-            `${t} no tiene ${withArticle(g.guess)}. Todos ven tu acusación, pero nadie ve su carta.`,
-            'public',
-          );
-    }
-    case 2: {
-      const e = find(effects, 'priest');
-      const seen = e?.secret?.hands?.[e.targetId];
-      if (!e || seen === undefined) return null;
-      return modal(
-        'Solo tú ves esto.',
-        `Esta es la carta que tiene ${nm(e.targetId)}. Los demás no la ven.`,
-        'private',
-        [{ caption: nm(e.targetId), value: seen }],
-      );
-    }
-    case 3: {
-      const e = find(effects, 'baron');
-      if (!e) return null;
-      const mineCard = e.secret?.hands?.[me];
-      const theirs = e.secret?.hands?.[e.targetId];
-      const t = nm(e.targetId);
-      const faces: ResultFace[] =
-        mineCard !== undefined && theirs !== undefined
-          ? [
-              { caption: 'Tu mano', value: mineCard },
-              { caption: t, value: theirs },
-            ]
-          : [];
-      if (e.loserId === null) {
-        return modal(
-          'Empate.',
-          'Las dos manos valen lo mismo y nadie queda fuera.',
-          'public',
-          faces,
-        );
-      }
-      if (e.loserId === me) {
-        return modal(
-          'Pierdes la comparación.',
-          `Tu ${cardName(e.loserCard as CardValue)} es más baja que ${theirs !== undefined ? withArticle(theirs) : `la de ${t}`}. Quedas fuera de la ronda.`,
-          'public',
-          faces,
-          true,
-        );
-      }
-      return modal(
-        '¡Ganas la comparación!',
-        `${t} tenía ${withArticle(e.loserCard as CardValue)}, más baja que ${mineCard !== undefined ? `tu ${cardName(mineCard)}` : 'tu carta'}. Queda fuera.`,
-        'public',
-        faces,
-        true,
-      );
-    }
-    case 4:
-      return toast(
-        key,
-        label,
-        'Doncella jugada',
-        'Jugaste la Doncella: nadie puede elegirte hasta tu próximo turno.',
-      );
-    case 5: {
-      const e = find(effects, 'prince');
-      if (!e) return null;
-      const t = nm(e.targetId);
-      const dropped: ResultFace = { caption: 'Descartada', value: e.discarded };
-      if (e.targetId === me) {
-        if (e.discarded === 9) {
-          return modal(
-            'Te elegiste.',
-            'Descartas la Princesa y quedas fuera de la ronda.',
-            'public',
-            [dropped],
-            true,
-          );
-        }
-        const fresh = find(effects, 'draw')?.secret?.drawn?.[0];
-        return modal(
-          'Descartas y robas.',
-          `Descartas ${cardName(e.discarded)} y robas una carta nueva. Solo tú ves la nueva.`,
-          'private',
-          fresh === undefined ? [dropped] : [dropped, { caption: 'Nueva', value: fresh }],
-        );
-      }
-      return e.discarded === 9
-        ? modal(
-            'La Princesa cae.',
-            `${t} descarta la Princesa y queda fuera.`,
-            'public',
-            [dropped],
-            true,
-          )
-        : modal(
-            'Descarte forzado.',
-            `${t} descarta ${withArticle(e.discarded)} y roba una carta nueva del mazo.`,
-            'public',
-            [dropped],
-          );
-    }
-    case 6:
-      return find(effects, 'chancellor')
-        ? null
-        : toast(
-            key,
-            label,
-            'Sin efecto',
-            'Jugaste el Canciller sin efecto: no quedan cartas en el mazo.',
-          );
-    case 7: {
-      const e = find(effects, 'king');
-      if (!e) return null;
-      const got = e.secret?.hands?.[me];
-      const gave = e.secret?.hands?.[e.targetId];
-      return modal(
-        'Manos intercambiadas.',
-        got !== undefined && gave !== undefined
-          ? `Entregas ${cardName(gave)} y recibes ${cardName(got)} de ${nm(e.targetId)}.`
-          : `Intercambiaste tu mano con ${nm(e.targetId)}.`,
-        'private',
-        got !== undefined && gave !== undefined
-          ? [
-              { caption: 'Entregas', value: gave },
-              { caption: 'Recibes', value: got },
-            ]
-          : [],
-      );
-    }
-    case 8:
-      return toast(
-        key,
-        label,
-        'Condesa jugada',
-        'Jugaste la Condesa: no tiene efecto. Los demás no saben qué te quedó.',
-      );
-    default: {
-      const e = find(effects, 'eliminated');
-      const other = e?.revealed[0];
-      return modal(
-        'Quedas fuera.',
-        'Descartaste la Princesa. Revelas tu otra carta y sales de la ronda.',
-        'public',
-        other === undefined ? [] : [{ caption: 'Tu otra carta', value: other }],
-        true,
-      );
-    }
-  }
-}
-
-/** Aviso de la jugada de otro: solo lo que tu vista permite saber (`secret` solo si va para ti). */
-function otherNotice(group: Extract<EventGroup, { kind: 'play' }>, ctx: TextContext): TableResult {
+/**
+ * Aviso de una jugada, el mismo para quien la hace y para quien la ve: quién, qué carta, contra
+ * quién y el texto público de `playText` (solo cambia la persona gramatical). Lo que solo tú
+ * puedes saber (`secret`, que el motor únicamente manda a los implicados) va aparte, en
+ * `secretFaces`, para enseñarlo etiquetado "Solo tú lo ves".
+ */
+function playNotice(group: Extract<EventGroup, { kind: 'play' }>, ctx: TextContext): TableResult {
   const { play, effects } = group;
   const me = ctx.me;
   const actor = play.playerId;
+  const mine = actor === me;
   const nm = ctx.name;
+  const who = mine ? 'Tú' : nm(actor);
   const targeted = effects.find((e) => 'targetId' in e) as
     | (GameEvent & { targetId: string })
     | undefined;
   const targetId = targeted?.targetId ?? null;
   const out = effects.some((e) => e.type === 'eliminated');
   const meOut = effects.some((e) => e.type === 'eliminated' && e.playerId === me);
-  const faces: ResultFace[] = [];
-  let priv = false;
+  const secretFaces: ResultFace[] = [];
   const king = find(effects, 'king');
   const baron = find(effects, 'baron');
   const prince = find(effects, 'prince');
+  const priest = find(effects, 'priest');
+  if (priest?.secret?.hands && mine) {
+    const seen = priest.secret.hands[priest.targetId];
+    if (seen !== undefined) secretFaces.push({ caption: nm(priest.targetId), value: seen });
+  }
   if (king?.secret?.hands && (king.targetId === me || king.playerId === me)) {
     const got = king.secret.hands[me];
-    const gave = king.secret.hands[king.targetId === me ? actor : king.targetId];
+    const other = mine ? king.targetId : actor;
+    const gave = king.secret.hands[mine ? king.targetId : actor];
     if (got !== undefined) {
-      priv = true;
-      faces.push({ caption: 'Recibes', value: got });
-      if (gave !== undefined) faces.push({ caption: `${nm(actor)} se queda`, value: gave });
+      if (mine && gave !== undefined) secretFaces.push({ caption: 'Entregas', value: gave });
+      secretFaces.push({ caption: 'Recibes', value: got });
+      if (!mine && gave !== undefined)
+        secretFaces.push({ caption: `${nm(other)} se queda`, value: gave });
     }
   }
   if (baron?.secret?.hands && (baron.targetId === me || baron.playerId === me)) {
-    const mine = baron.secret.hands[me];
-    const theirs = baron.secret.hands[actor];
-    if (mine !== undefined && theirs !== undefined) {
-      faces.push({ caption: 'Tu mano', value: mine }, { caption: nm(actor), value: theirs });
+    const other = mine ? baron.targetId : actor;
+    const mineCard = baron.secret.hands[me];
+    const theirs = baron.secret.hands[other];
+    if (mineCard !== undefined && theirs !== undefined) {
+      secretFaces.push(
+        { caption: 'Tu mano', value: mineCard },
+        { caption: nm(other), value: theirs },
+      );
     }
   }
   if (prince && prince.targetId === me) {
-    faces.push({ caption: 'Descartas', value: prince.discarded });
     const fresh = find(effects, 'draw')?.secret?.drawn?.[0];
-    if (fresh !== undefined) {
-      priv = true;
-      faces.push({ caption: 'Nueva', value: fresh });
-    }
+    if (fresh !== undefined) secretFaces.push({ caption: 'Tu carta nueva', value: fresh });
   }
   return {
     key: `ev-${play.id}`,
     style: 'modal',
-    label: `Jugada de ${nm(actor)}: ${cardName(play.card)}`,
-    title: `${nm(actor)} jugó ${withArticle(play.card)}`,
+    label: mine
+      ? `Tu jugada: ${cardName(play.card)}`
+      : `Jugada de ${nm(actor)}: ${cardName(play.card)}`,
+    title: `${who} ${mine ? 'jugaste' : 'jugó'} ${withArticle(play.card)}`,
     body: playText(play, effects, ctx),
-    faces,
-    visibility: priv ? 'private' : 'public',
+    faces: [],
+    secretFaces,
+    visibility: 'public',
     hit: out,
-    other: { actorId: actor, card: play.card, targetId, affectsMe: targetId === me || meOut },
+    other: {
+      actorId: actor,
+      card: play.card,
+      targetId,
+      // Si te afecta o hay algo privado que leer, espera a Continuar; si no, se cierra solo.
+      affectsMe: targetId === me || meOut || secretFaces.length > 0,
+    },
   };
 }
 
@@ -306,12 +132,9 @@ export function buildResults(
   const results: TableResult[] = [];
   for (const group of groupEvents(events)) {
     if (group.kind === 'play') {
-      if (group.play.playerId === ctx.me) {
-        const r = mineResult(group, ctx);
-        if (r) results.push(r);
-        continue;
-      }
-      results.push(otherNotice(group, ctx));
+      // Tu Canciller abre su propia elección: no hace falta avisar de la jugada.
+      if (group.play.playerId === ctx.me && find(group.effects, 'chancellor')) continue;
+      results.push(playNotice(group, ctx));
       continue;
     }
     const e = group.event;

@@ -24,6 +24,8 @@ import type { PlayerView } from './view';
 export interface BotNotes {
   /** 0..1: how much noise it adds to its choices (more = more adventurous). */
   risk: number;
+  /** The last lines this bot said, so it does not repeat itself (managed by `botRemark`). */
+  recent?: string[];
 }
 
 export function emptyBotNotes(): BotNotes {

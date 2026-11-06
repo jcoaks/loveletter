@@ -2,9 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { createBotNotes } from './bot';
 import { botEvents, botFarewell, botRemark } from './bot-talk';
 import { countCards } from './game';
-import { type Random, seededRandom, shuffle } from './random';
-import type { CardValue } from './rules';
-import { simulate } from './test-helpers';
+import { type Random, seededRandom } from './random';
+import { scramble, simulate } from './test-helpers';
 import type { GameState } from './types';
 import { viewFor } from './view';
 
@@ -21,22 +20,6 @@ function keysOf(value: unknown, into = new Set<string>()): Set<string> {
     }
   }
   return into;
-}
-
-/** Same game as seen from `viewerId`, but with every hidden card replaced by a different one. */
-function scramble(state: GameState, viewerId: string, random: Random): GameState {
-  const copy = structuredClone(state);
-  const others = copy.players.map((p) => p.id).filter((id) => id !== viewerId);
-  const pool: CardValue[] = [
-    ...copy.deck,
-    ...(copy.setAside === null ? [] : [copy.setAside]),
-    ...others.flatMap((id) => copy.hands[id] as CardValue[]),
-  ];
-  const mixed = shuffle(pool, random);
-  copy.deck = mixed.splice(0, copy.deck.length);
-  if (copy.setAside !== null) copy.setAside = mixed.shift() as CardValue;
-  for (const id of others) copy.hands[id] = mixed.splice(0, (copy.hands[id] as CardValue[]).length);
-  return copy;
 }
 
 function checkViews(state: GameState, random: Random): void {

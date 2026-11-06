@@ -78,14 +78,15 @@ export function playText(
   }
   switch (play.card) {
     case 0:
-      return `${head}: sin efecto. Si es el único en jugar un Espía, gana una ficha al cerrar la ronda.`;
+      return `${head}.`;
     case 1: {
       const g = find(effects, 'guess');
       if (!g) return `${head}.`;
       const T = g.targetId;
+      const named = mine ? 'nombraste' : 'nombró';
       return g.correct
-        ? `${head} contra ${ref(T)} y nombró ${withArticle(g.guess)}: acertó. ${cap(out(T))}.`
-        : `${head} contra ${ref(T)} y nombró ${withArticle(g.guess)}: falló.`;
+        ? `${head} contra ${ref(T)} y ${named} ${withArticle(g.guess)}: ${mine ? 'acertaste' : 'acertó'}. ${cap(out(T))}.`
+        : `${head} contra ${ref(T)} y ${named} ${withArticle(g.guess)}: ${mine ? 'fallaste' : 'falló'}.`;
     }
     case 2: {
       const e = find(effects, 'priest');

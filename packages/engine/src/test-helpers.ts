@@ -173,3 +173,26 @@ export function simulate(
   }
   throw new Error(`La partida ${seed} no terminó`);
 }
+
+/** Same game as seen from `viewerId`, but with every hidden card replaced by a different one. */
+export function scramble(
+  state: GameState,
+  viewerId: string,
+  random: Random,
+  /** Also replace the viewer's own hand and drop every private event detail. */
+  hideOwn = false,
+): GameState {
+  const copy = structuredClone(state);
+  const others = copy.players.map((p) => p.id).filter((id) => hideOwn || id !== viewerId);
+  const pool: CardValue[] = [
+    ...copy.deck,
+    ...(copy.setAside === null ? [] : [copy.setAside]),
+    ...others.flatMap((id) => copy.hands[id] as CardValue[]),
+  ];
+  const mixed = shuffle(pool, random);
+  copy.deck = mixed.splice(0, copy.deck.length);
+  if (copy.setAside !== null) copy.setAside = mixed.shift() as CardValue;
+  for (const id of others) copy.hands[id] = mixed.splice(0, (copy.hands[id] as CardValue[]).length);
+  if (hideOwn) for (const e of copy.events) delete (e as { secret?: unknown }).secret;
+  return copy;
+}

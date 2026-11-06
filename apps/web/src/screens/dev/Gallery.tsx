@@ -8,6 +8,7 @@ import { GuardModal } from '../../components/GuessPicker';
 import { GuideModal } from '../../components/GuideModal';
 import { HandRow } from '../../components/HandRow';
 import { type PickerPlayer, PlayerPickerModal } from '../../components/PlayerPickerModal';
+import { PlayNoticeModal } from '../../components/PlayNoticeModal';
 import { ResultModal } from '../../components/ResultModal';
 import { MineBar, SeatCard } from '../../components/SeatCard';
 import { TableLayout } from '../../components/TableLayout';
@@ -15,6 +16,7 @@ import { ToastStack } from '../../components/ToastStack';
 import { Tokens } from '../../components/Token';
 import { TurnBanner } from '../../components/TurnBanner';
 import { CARDS, type CardValue, isLockedByCountess, TOKENS_TO_WIN } from '../../lib/cards';
+import { buildResults, type TableResult } from '../../lib/results';
 import type { SeatData } from '../../lib/seat';
 import { rig, step } from '../../test-utils';
 import { RoundOverModal } from '../special/RoundOver';
@@ -85,6 +87,7 @@ type ModalKey =
   | 'confirm'
   | 'discards'
   | 'round-over'
+  | 'own-spy'
   | null;
 
 const Section = ({ title, children }: { title: string; children: ReactNode }) => (
@@ -93,6 +96,17 @@ const Section = ({ title, children }: { title: string; children: ReactNode }) =>
     {children}
   </section>
 );
+
+/** El aviso que ve quien juega el Espía (el mismo que ven los demás, con él como actor). */
+function ownSpy(): TableResult | undefined {
+  const state = step(rig({ hands: [[0, 2], [3], [4]] }), {
+    type: 'play_card',
+    playerId: 'p0',
+    card: 0,
+  });
+  const names: Record<string, string> = { p0: 'Ana', p1: 'Beto', p2: 'Carla' };
+  return buildResults(viewFor(state, 'p0').events, { me: 'p0', name: (id) => names[id] ?? '?' })[0];
+}
 
 /** Vista real del motor al cerrar una ronda por mazo agotado (para ver la carta apartada). */
 function roundOverView() {
@@ -251,6 +265,7 @@ export function Gallery() {
               ['confirm', 'Confirmar Princesa'],
               ['discards', 'Descartes'],
               ['round-over', 'Fin de ronda'],
+              ['own-spy', 'Aviso propio (Espía)'],
             ] as [Exclude<ModalKey, null>, string][]
           ).map(([k, label]) => (
             <button key={k} type="button" className="ll-ghost" onClick={() => setModal(k)}>
@@ -346,6 +361,15 @@ export function Gallery() {
         >
           Si la descartas, quedas fuera de la ronda.
         </ConfirmDialog>
+      )}
+      {modal === 'own-spy' && ownSpy() && (
+        <PlayNoticeModal
+          notice={ownSpy() as TableResult}
+          actorName="Tú"
+          targetName={null}
+          autoCloseMs={5000}
+          onContinue={close}
+        />
       )}
       {modal === 'round-over' && (
         <RoundOverModal game={roundOverView()} onContinue={close} onHide={close} />

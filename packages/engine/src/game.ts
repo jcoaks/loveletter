@@ -349,7 +349,11 @@ function playCard(
 
   removeFromHand(state, playerId, card);
   discard(state, playerId, card);
-  emit(state, { type: 'play', playerId, card }, forced ? { to: [playerId], forced: true } : undefined);
+  emit(
+    state,
+    { type: 'play', playerId, card },
+    forced ? { to: [playerId], forced: true } : undefined,
+  );
 
   if (needsTarget(card) && targetId === null) {
     emit(state, { type: 'no_effect', playerId, card, reason: 'no_targets' });

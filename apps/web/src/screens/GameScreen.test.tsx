@@ -162,34 +162,45 @@ describe('GameScreen: resultados', () => {
     return { user, after, rerender };
   }
 
-  it('Sacerdote: ventana privada con la carta vista', async () => {
+  it('Sacerdote: el aviso público de tu jugada y, aparte, la carta "Solo tú lo ves"', async () => {
     await playAndSee(rig({ hands: [[2, 7], [3], [4]] }), 2, 'p1');
-    const d = within(await screen.findByRole('dialog', { name: 'Resultado: Sacerdote' }));
-    expect(d.getByText('Privado · solo tú lo ves')).toBeInTheDocument();
-    const face = d.getByRole('img', { name: 'Beto: Barón' });
+    const d = within(await screen.findByRole('dialog', { name: 'Tu jugada: Sacerdote' }));
+    expect(d.getByRole('heading', { name: 'Tú jugaste el Sacerdote' })).toBeInTheDocument();
+    expect(d.getByText('Público')).toBeInTheDocument();
+    const secret = within(d.getByRole('region', { name: 'Solo tú lo ves' }));
+    const face = secret.getByRole('img', { name: 'Beto: Barón' });
     // Carta grande con arte, nombre y efecto; nunca la pequeña.
     expect(face).not.toHaveClass('sm');
     expect(face).toHaveTextContent('Barón');
   });
 
-  it('Guardia y Barón son públicos', async () => {
+  it('Guardia y Barón: el mismo aviso público que ven los demás', async () => {
     await playAndSee(rig({ hands: [[1, 2], [3], [4]] }), 1, 'p1', 3);
-    const d = within(await screen.findByRole('dialog', { name: 'Resultado: Guardia' }));
-    expect(d.getByText('Público · todos lo ven')).toBeInTheDocument();
-    expect(d.getByText('¡Acertaste!')).toBeInTheDocument();
+    const d = within(await screen.findByRole('dialog', { name: 'Tu jugada: Guardia' }));
+    expect(d.getByText('Público')).toBeInTheDocument();
+    expect(
+      d.getByText(
+        'Jugaste el Guardia contra Beto y nombraste el Barón: acertaste. Beto queda fuera.',
+      ),
+    ).toBeInTheDocument();
+    expect(d.queryByRole('region', { name: 'Solo tú lo ves' })).toBeNull();
     cleanup();
     await playAndSee(rig({ hands: [[3, 2], [5], [4]] }), 3, 'p1');
-    const b = within(await screen.findByRole('dialog', { name: 'Resultado: Barón' }));
-    expect(b.getByText('Público · todos lo ven')).toBeInTheDocument();
-    expect(b.getByText('Pierdes la comparación.')).toBeInTheDocument();
+    const b = within(await screen.findByRole('dialog', { name: 'Tu jugada: Barón' }));
+    expect(b.getByText('Público')).toBeInTheDocument();
+    expect(b.getByText(/tu mano era la más baja \(Sacerdote\) y quedas fuera/)).toBeInTheDocument();
+    // Ambas manos solo para ti.
+    expect(
+      within(b.getByRole('region', { name: 'Solo tú lo ves' })).getAllByRole('img'),
+    ).toHaveLength(2);
   });
 
-  it('Rey: privado con lo entregado y lo recibido', async () => {
+  it('Rey: lo entregado y lo recibido, solo para ti', async () => {
     await playAndSee(rig({ hands: [[7, 1], [3], [4]] }), 7, 'p1');
-    const d = within(await screen.findByRole('dialog', { name: 'Resultado: Rey' }));
-    expect(d.getByText('Privado · solo tú lo ves')).toBeInTheDocument();
-    expect(d.getByText('Entregas')).toBeInTheDocument();
-    expect(d.getByText('Recibes')).toBeInTheDocument();
+    const d = within(await screen.findByRole('dialog', { name: 'Tu jugada: Rey' }));
+    const secret = within(d.getByRole('region', { name: 'Solo tú lo ves' }));
+    expect(secret.getByText('Entregas')).toBeInTheDocument();
+    expect(secret.getByText('Recibes')).toBeInTheDocument();
   });
 
   it('no repite resultados antiguos al abrir la pantalla (reconexión)', () => {
@@ -399,7 +410,7 @@ describe('GameScreen: avisos de jugadas ajenas', () => {
   it('tu propia jugada no abre aviso de jugada ajena', async () => {
     const before = rig({ hands: [[2, 7], [3], [4]] });
     watch(before, play(before, 2, 'p1'), 'p0');
-    await screen.findByRole('dialog', { name: 'Resultado: Sacerdote' });
+    await screen.findByRole('dialog', { name: 'Tu jugada: Sacerdote' });
     expect(screen.queryByRole('dialog', { name: /^Jugada de/ })).toBeNull();
   });
 
@@ -546,18 +557,14 @@ describe('GameScreen: elegir jugador y logo', () => {
   });
 });
 
-describe('GameScreen: avisos inferiores (toasts)', () => {
+describe('GameScreen: avisos de tus jugadas triviales', () => {
   afterEach(() => {
     vi.useRealTimers();
     useUiStore.setState({ noticeMode: 'full' });
   });
 
-  async function trivial(
-    card: CardValue,
-    text: string,
-    extra: Parameters<typeof rig>[0]['protect'] = [],
-  ) {
-    const before = rig({ hands: [[card, 2], [3], [5]], protect: extra });
+  function startWith(before: GameState, mode: 'full' | 'brief' = 'full') {
+    useUiStore.setState({ noticeMode: mode });
     const fns = { act: vi.fn(() => true), send: vi.fn(() => true) };
     seed(before, 'p0', fns);
     render(
@@ -565,102 +572,68 @@ describe('GameScreen: avisos inferiores (toasts)', () => {
         <GameScreen />
       </MemoryRouter>,
     );
-    rtlAct(() => seed(play(before, card), 'p0', fns));
-    expect(await screen.findByText(text)).toBeInTheDocument();
-    return { ...fns, before };
+    return fns;
   }
 
-  it.each<[CardValue, string]>([
-    [0, 'Jugaste el Espía. Si al cerrar la ronda eres el único con un Espía, ganas una ficha.'],
-    [4, 'Jugaste la Doncella: nadie puede elegirte hasta tu próximo turno.'],
-    [8, 'Jugaste la Condesa: no tiene efecto. Los demás no saben qué te quedó.'],
-  ])('carta %i: aviso claro, sin Continuar, y se cierra solo', async (card, text) => {
+  it.each<[CardValue, string, string]>([
+    [0, 'Tú jugaste el Espía', 'Jugaste el Espía.'],
+    [4, 'Tú jugaste la Doncella', 'Jugaste la Doncella: quedas protegido hasta tu próximo turno.'],
+    [8, 'Tú jugaste la Condesa', 'Jugaste la Condesa: sin efecto.'],
+  ])(
+    'carta %i, modo completo: ventana con la carta grande y cierre solo',
+    async (card, title, text) => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const before = rig({ hands: [[card, 2], [3], [5]] });
+      const fns = startWith(before);
+      rtlAct(() => seed(play(before, card), 'p0', fns));
+      const d = within(await screen.findByRole('dialog', { name: /^Tu jugada: / }));
+      expect(d.getByRole('heading', { name: title })).toBeInTheDocument();
+      expect(d.getByText(text, { selector: 'p' })).toBeInTheDocument();
+      expect(d.getByText('Público')).toBeInTheDocument();
+      expect(d.getByText('Se cierra en 5 s')).toBeInTheDocument();
+      // Sin el texto explicativo de la regla del Espía.
+      expect(d.queryByText(/Si al cerrar la ronda/)).toBeNull();
+      await rtlAct(() => vi.advanceTimersByTimeAsync(5600));
+      expect(screen.queryByRole('dialog')).toBeNull();
+    },
+  );
+
+  it('modo breve: el mismo texto en el aviso inferior, sin Continuar, y se cierra solo', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    await trivial(card, text);
+    const before = rig({ hands: [[0, 2], [3], [5]] });
+    const fns = startWith(before, 'brief');
+    rtlAct(() => seed(play(before, 0), 'p0', fns));
+    expect(await screen.findByText('Jugaste el Espía.')).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Continuar' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Cerrar aviso' })).toBeInTheDocument();
-    expect(document.querySelector('.ll-toast')).toHaveAttribute('role', 'status');
     await rtlAct(() => vi.advanceTimersByTimeAsync(5000));
-    expect(screen.queryByText(text)).toBeNull();
+    expect(screen.queryByText('Jugaste el Espía.')).toBeNull();
   });
 
-  it('sin objetivos: "sin efecto" con el motivo', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
+  it('sin objetivos: el aviso explica que no había a quién elegir', async () => {
     const before = rig({ hands: [[1, 2], [3], [4]], protect: [1, 2] });
-    const fns = { act: vi.fn(() => true), send: vi.fn(() => true) };
-    seed(before, 'p0', fns);
-    render(
-      <MemoryRouter>
-        <GameScreen />
-      </MemoryRouter>,
-    );
+    const fns = startWith(before);
     rtlAct(() => seed(play(before, 1), 'p0', fns));
     expect(
-      await screen.findByText(
-        'Jugaste el Guardia sin efecto: todos los demás están protegidos o eliminados.',
-      ),
+      await screen.findByText('Jugaste el Guardia, pero no había a quién elegir: sin efecto.'),
     ).toBeInTheDocument();
   });
 
-  it('no bloquea el juego mientras está en pantalla ni tapa la barra de acciones', async () => {
+  it('table_ready sale al cerrarse el aviso, sin esperar un clic', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     const before = rig({ hands: [[4, 2], [3], [5]] });
-    const fns = { act: vi.fn(() => true), send: vi.fn(() => true) };
-    // Tu turno otra vez: Ana juega la Doncella y la mesa vuelve a ella tras los otros.
-    seed(before, 'p1', fns);
-    const { container } = render(
-      <MemoryRouter>
-        <GameScreen />
-      </MemoryRouter>,
-    );
-    rtlAct(() => seed(play(before, 4), 'p1', fns));
-    // La jugada de Ana abre su ventana; el aviso de tu propio caso no se mezcla.
-    expect(
-      await screen.findByRole('dialog', { name: 'Jugada de Ana: Doncella' }),
-    ).toBeInTheDocument();
-    expect(container.querySelector('.ll-toasts')?.closest('.ll-actbar')).toBeNull();
-  });
-
-  it('pausa con el cursor, cierre manual y varios avisos apilados', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    const before = rig({ hands: [[0, 2], [4], [8]] });
-    const fns = { act: vi.fn(() => true), send: vi.fn(() => true) };
-    seed(before, 'p0', fns);
-    render(
-      <MemoryRouter>
-        <GameScreen />
-      </MemoryRouter>,
-    );
-    // Tres jugadas triviales de Ana, Beto y Carla vistas por un espectador cualquiera no son avisos
-    // (son ventanas); aquí se apilan tres avisos propios seguidos.
-    const s = play(before, 0);
-    rtlAct(() => seed(s, 'p0', fns));
-    expect(await screen.findByText(/Jugaste el Espía/)).toBeInTheDocument();
-    const toast = screen.getByText(/Jugaste el Espía/).closest('.ll-toast') as HTMLElement;
-    const { fireEvent } = await import('@testing-library/react');
-    fireEvent.mouseEnter(toast);
-    await rtlAct(() => vi.advanceTimersByTimeAsync(9000));
-    expect(screen.getByText(/Jugaste el Espía/)).toBeInTheDocument();
-    fireEvent.mouseLeave(toast);
-    await userEvent
-      .setup({ advanceTimers: vi.advanceTimersByTime })
-      .click(screen.getByRole('button', { name: 'Cerrar aviso' }));
-    expect(screen.queryByText(/Jugaste el Espía/)).toBeNull();
-  });
-
-  it('table_ready sale al expirar el aviso, sin esperar un clic', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    const { send, before } = await trivial(
-      4,
-      'Jugaste la Doncella: nadie puede elegirte hasta tu próximo turno.',
-    );
+    const fns = startWith(before);
     const after = play(before, 4);
-    expect(send).not.toHaveBeenCalledWith(
+    rtlAct(() => seed(after, 'p0', fns));
+    await screen.findByRole('dialog', { name: 'Tu jugada: Doncella' });
+    expect(fns.send).not.toHaveBeenCalledWith(
       expect.objectContaining({ type: 'table_ready', moment: tableMoment(viewFor(after, 'p0')) }),
     );
-    await rtlAct(() => vi.advanceTimersByTimeAsync(5000));
-    await rtlAct(() => vi.advanceTimersByTimeAsync(1000));
-    expect(send).toHaveBeenCalledWith({
+    await rtlAct(() => vi.advanceTimersByTimeAsync(5600));
+    // Cada etapa (cierre, vuelo del siguiente robo, pausa de calma) necesita su propio ciclo de React.
+    for (let i = 0; i < 6; i++) await rtlAct(() => vi.advanceTimersByTimeAsync(300));
+    expect(fns.send).toHaveBeenCalledWith({
       type: 'table_ready',
       moment: tableMoment(viewFor(after, 'p0')),
     });
