@@ -114,7 +114,7 @@ describe('resultados', () => {
       ev(play(rig({ hands: [[1, 2], [3], [4]], protect: [1, 2] }), 1), 'p0'),
       ctx,
     );
-    expect(none[0]).toMatchObject({ style: 'toast', title: 'Sin efecto.' });
+    expect(none[0]).toMatchObject({ style: 'toast', title: 'Sin efecto' });
   });
 
   it('no genera aviso para tus propias jugadas ni para sucesos que no son jugadas', () => {

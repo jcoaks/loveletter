@@ -67,8 +67,8 @@ function mineResult(
     return toast(
       key,
       label,
-      'Sin efecto.',
-      `Todos los rivales están protegidos o eliminados, así que ${withArticle(play.card)} se descarta sin hacer nada.`,
+      'Sin efecto',
+      `Jugaste ${withArticle(play.card)} sin efecto: todos los demás están protegidos o eliminados.`,
     );
   }
   switch (play.card) {
@@ -76,8 +76,8 @@ function mineResult(
       return toast(
         key,
         label,
-        'Espía jugado.',
-        'No pasa nada ahora. Si al cerrar la ronda eres el único con un Espía jugado y sigues en juego, ganas 1 ficha extra.',
+        'Espía jugado',
+        'Jugaste el Espía. Si al cerrar la ronda eres el único con un Espía, ganas una ficha.',
       );
     case 1: {
       const g = find(effects, 'guess');
@@ -150,8 +150,8 @@ function mineResult(
       return toast(
         key,
         label,
-        'Protección activa.',
-        'Hasta tu próximo turno nadie puede elegirte con una carta.',
+        'Doncella jugada',
+        'Jugaste la Doncella: nadie puede elegirte hasta tu próximo turno.',
       );
     case 5: {
       const e = find(effects, 'prince');
@@ -194,7 +194,12 @@ function mineResult(
     case 6:
       return find(effects, 'chancellor')
         ? null
-        : toast(key, label, 'Sin efecto.', 'No quedan cartas en el mazo para robar.');
+        : toast(
+            key,
+            label,
+            'Sin efecto',
+            'Jugaste el Canciller sin efecto: no quedan cartas en el mazo.',
+          );
     case 7: {
       const e = find(effects, 'king');
       if (!e) return null;
@@ -218,8 +223,8 @@ function mineResult(
       return toast(
         key,
         label,
-        'Condesa descartada.',
-        'No tiene efecto. Jugarla sin necesidad hace creer a los demás que tienes Rey o Príncipe.',
+        'Condesa jugada',
+        'Jugaste la Condesa: no tiene efecto. Los demás no saben qué te quedó.',
       );
     default: {
       const e = find(effects, 'eliminated');

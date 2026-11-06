@@ -1,7 +1,8 @@
-import type { CardValue, LegalPlay } from '@loveletter/engine';
+import { CARD_VALUES, type CardValue, type LegalPlay } from '@loveletter/engine';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChancellorModal } from '../components/ChancellorModal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { CountsBox } from '../components/CountsBox';
 import { DiscardsModal } from '../components/DiscardsModal';
 import { GuardModal } from '../components/GuessPicker';
 import { GuideModal } from '../components/GuideModal';
@@ -14,15 +15,17 @@ import { ResultModal } from '../components/ResultModal';
 import { RulesModal } from '../components/RulesContent';
 import { MineBar } from '../components/SeatCard';
 import { TableLayout } from '../components/TableLayout';
-import { Toast } from '../components/Toast';
+import { ToastStack } from '../components/ToastStack';
 import { TurnBanner } from '../components/TurnBanner';
 import { useCanAct, useGame, useRoom } from '../hooks/room';
 import { useBotSpeech } from '../hooks/useBotSpeech';
 import { useTableReady } from '../hooks/useTableReady';
 import { CARD_BY_VALUE, cardName } from '../lib/cards';
 import { chronicle, type TextContext } from '../lib/chronicle';
+import { cardCounts } from '../lib/counts';
 import { buildResults, type ChancellorPick, type TableResult } from '../lib/results';
 import { pickerPlayers, seatsOf } from '../lib/seats';
+import type { NoticeMode } from '../lib/session';
 import { useRoomStore } from '../store/room';
 import { useUiStore } from '../store/ui';
 import { GameOverModal } from './special/GameOver';
@@ -35,18 +38,24 @@ type Flow = 'picker' | 'guard' | 'confirm' | null;
 /** Los avisos que no te afectan se cierran solos tras este tiempo. */
 const NOTICE_AUTO_MS = 5000;
 
-/** Resultados nuevos (tus jugadas y lo que otros te hacen), en cola. No repite lo ya visto al conectar. */
-function useResults(ctx: TextContext) {
+/**
+ * Resultados nuevos (tus jugadas y lo que otros te hacen). No repite lo ya visto al conectar.
+ * Los que informan o te afectan van a la cola de ventanas (de una en una); los informativos puros
+ * (cartas triviales, jugadas ajenas en modo breve) van a avisos que no bloquean.
+ */
+function useResults(ctx: TextContext, mode: NoticeMode) {
   const game = useGame();
   const seen = useRef<number | null>(null);
   const chancellor = useRef<ChancellorPick | null>(null);
   const [queue, setQueue] = useState<TableResult[]>([]);
+  const [toasts, setToasts] = useState<TableResult[]>([]);
   // biome-ignore lint/correctness/useExhaustiveDependencies: el contexto cambia en cada render; solo importan los sucesos
   useEffect(() => {
     const lastId = game.events.at(-1)?.id ?? -1;
     if (seen.current === null || lastId < seen.current) {
       seen.current = lastId;
       setQueue([]);
+      setToasts([]);
       return;
     }
     const base = seen.current;
@@ -54,11 +63,18 @@ function useResults(ctx: TextContext) {
     if (fresh.length === 0) return;
     seen.current = lastId;
     const results = buildResults(fresh, ctx, chancellor.current);
-    if (results.length) setQueue((q) => [...q, ...results]);
+    const isToast = (r: TableResult) =>
+      r.style === 'toast' || (r.other !== undefined && mode === 'brief' && !r.other.affectsMe);
+    const modals = results.filter((r) => !isToast(r));
+    const light = results.filter(isToast);
+    if (modals.length) setQueue((q) => [...q, ...modals]);
+    if (light.length) setToasts((t) => [...t, ...light]);
   }, [game.events]);
   return {
     queue,
+    toasts,
     dismiss: () => setQueue((q) => q.slice(1)),
+    dismissToast: (key: string) => setToasts((t) => t.filter((x) => x.key !== key)),
     rememberChancellor: (pick: ChancellorPick) => {
       chancellor.current = pick;
     },
@@ -106,25 +122,28 @@ export function GameScreen() {
     [game.you.id, game.players],
   );
   const seats = useMemo(() => seatsOf(game, room), [game, room]);
-  const results = useResults(ctx);
+  const counts = useMemo(() => cardCounts(game), [game]);
+  const leftMap = useMemo(
+    () =>
+      Object.fromEntries(CARD_VALUES.map((v) => [v, counts[v].left])) as Record<CardValue, number>,
+    [counts],
+  );
+  const results = useResults(ctx, noticeMode);
   const current = results.queue[0];
 
-  const revealKeys = useMemo(() => results.queue.map((r) => r.key), [results.queue]);
+  const revealKeys = useMemo(
+    () => [...results.queue, ...results.toasts].map((r) => r.key),
+    [results.queue, results.toasts],
+  );
   const modalOpen =
     Boolean(flow) || Boolean(current) || seatInfo !== null || dialog !== null || logOpen;
   const speech = useBotSpeech(room.chat, modalOpen, revealKeys);
-  const busy = results.queue.length > 0 || speech.pending || Object.keys(speech.speech).length > 0;
+  const busy =
+    results.queue.length > 0 ||
+    results.toasts.length > 0 ||
+    speech.pending ||
+    Object.keys(speech.speech).length > 0;
   useTableReady(game, busy);
-
-  // Avisos breves: los que no te afectan se cierran solos.
-  const briefKey =
-    current?.other && noticeMode === 'brief' && !current.other.affectsMe ? current.key : null;
-  // biome-ignore lint/correctness/useExhaustiveDependencies: solo cuenta el aviso en pantalla
-  useEffect(() => {
-    if (!briefKey) return;
-    const timer = window.setTimeout(results.dismiss, NOTICE_AUTO_MS);
-    return () => window.clearTimeout(timer);
-  }, [briefKey]);
 
   // Una vista nueva libera el botón de jugar.
   const eventCount = game.events.length;
@@ -322,6 +341,11 @@ export function GameScreen() {
           <button type="button" className="ll-ghost ll-exit" onClick={() => openDialog('leave')}>
             Salir
           </button>
+          <ToastStack
+            anchored
+            items={results.toasts.map((r) => ({ key: r.key, body: r.body }))}
+            onDismiss={results.dismissToast}
+          />
         </div>
         <TableLayout
           rivals={seats.rivals}
@@ -341,6 +365,7 @@ export function GameScreen() {
           speech={speech.speech}
           onOpenSeat={setSeatInfo}
           onOpenGuide={() => openDialog('guide')}
+          guideCounts={counts}
           actions={actions}
           mine={
             <>
@@ -367,7 +392,7 @@ export function GameScreen() {
       {dialog === 'rules' && <RulesModal onClose={closeDialog} />}
 
       {/* Jugada de otro jugador: ventana completa o aviso breve según la preferencia. */}
-      {current?.other && noticeMode === 'full' && (
+      {current?.other && (
         <PlayNoticeModal
           notice={current}
           actorName={ctx.name(current.other.actorId)}
@@ -384,14 +409,7 @@ export function GameScreen() {
       )}
 
       {/* Resultado de tu jugada: ventana si importa, aviso si es trivial. */}
-      <Toast
-        message={
-          current && (current.style === 'toast' || (current.other && noticeMode === 'brief'))
-            ? { title: current.title, body: current.body }
-            : null
-        }
-        onDismiss={results.dismiss}
-      />
+
       {current?.style === 'modal' && !current.other && (
         <ResultModal
           label={current.label}
@@ -412,7 +430,9 @@ export function GameScreen() {
           restCard={lp.card === 5 ? restCard : undefined}
           onPick={(id) => submit(lp.card, id)}
           onCancel={() => setFlow(null)}
-        />
+        >
+          <CountsBox counts={counts} discards={seats.me.discards} hand={hand} />
+        </PlayerPickerModal>
       )}
       {flow === 'guard' && lp && (
         <GuardModal
@@ -424,6 +444,15 @@ export function GameScreen() {
           onGuess={setGuess}
           onAccuse={() => target && guess !== null && submit(1, target, guess)}
           onCancel={() => setFlow(null)}
+          left={leftMap}
+          info={
+            <CountsBox
+              counts={counts}
+              discards={seats.me.discards}
+              hand={hand}
+              showCounts={false}
+            />
+          }
         />
       )}
       {flow === 'confirm' && (
@@ -460,7 +489,9 @@ export function GameScreen() {
           onClose={() => setSeatInfo(null)}
         />
       )}
-      {dialog === 'guide' && <GuideModal players={game.players.length} onClose={closeDialog} />}
+      {dialog === 'guide' && (
+        <GuideModal players={game.players.length} counts={counts} onClose={closeDialog} />
+      )}
 
       {showEnd && game.phase === 'round_over' && (
         <RoundOverModal

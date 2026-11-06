@@ -1,6 +1,7 @@
 import { normalizeRoomCode } from '@loveletter/protocol';
 import { lazy, Suspense, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router';
+import { ToastStack } from '../components/ToastStack';
 import { seatToken } from '../lib/session';
 import { type ClosedReason, useRoomStore } from '../store/room';
 import { JoinLinkScreen } from './entry/JoinLink';
@@ -38,12 +39,6 @@ export default function RoomPage() {
 
   useEffect(() => () => useRoomStore.getState().disconnect(), []);
 
-  useEffect(() => {
-    if (!notice) return;
-    const timer = window.setTimeout(dismiss, 5000);
-    return () => window.clearTimeout(timer);
-  }, [notice, dismiss]);
-
   if (closedReason && closedReason !== 'left' && storeCode === code) {
     return <ClosedScreen reason={closedReason} />;
   }
@@ -61,20 +56,10 @@ export default function RoomPage() {
         </Suspense>
       )}
       {room.status === 'lobby' && <LeaveDialog />}
-      <div
-        role="status"
-        aria-live="polite"
-        className="pointer-events-none fixed inset-x-0 top-3 z-50 flex justify-center px-4"
-      >
-        {notice && (
-          <div className="pointer-events-auto flex max-w-lg items-center gap-3 rounded-xl border border-wax bg-wine px-4 py-3 shadow-lg">
-            <span>{notice.message}</span>
-            <button type="button" className="ll-ghost" onClick={dismiss}>
-              Cerrar
-            </button>
-          </div>
-        )}
-      </div>
+      <ToastStack
+        items={notice ? [{ key: String(notice.id), body: notice.message, tone: 'alert' }] : []}
+        onDismiss={dismiss}
+      />
     </>
   );
 }

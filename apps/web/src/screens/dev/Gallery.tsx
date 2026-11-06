@@ -2,6 +2,7 @@ import { type ReactNode, useState } from 'react';
 import { Card, CardBack } from '../../components/Card';
 import { ChancellorModal } from '../../components/ChancellorModal';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { CountsBox } from '../../components/CountsBox';
 import { DiscardsModal } from '../../components/DiscardsModal';
 import { GuardModal } from '../../components/GuessPicker';
 import { GuideModal } from '../../components/GuideModal';
@@ -10,10 +11,11 @@ import { type PickerPlayer, PlayerPickerModal } from '../../components/PlayerPic
 import { ResultModal } from '../../components/ResultModal';
 import { MineBar, SeatCard } from '../../components/SeatCard';
 import { TableLayout } from '../../components/TableLayout';
-import { Toast } from '../../components/Toast';
+import { ToastStack } from '../../components/ToastStack';
 import { Tokens } from '../../components/Token';
 import { TurnBanner } from '../../components/TurnBanner';
 import { CARDS, type CardValue, isLockedByCountess, TOKENS_TO_WIN } from '../../lib/cards';
+import { cardCounts } from '../../lib/counts';
 import type { SeatData } from '../../lib/seat';
 
 const SEATS: SeatData[] = [
@@ -247,14 +249,16 @@ export function Gallery() {
         </div>
       </Section>
 
-      <Toast
-        message={
+      <ToastStack
+        items={
           toast
-            ? {
-                title: 'Espía jugado.',
-                body: 'No pasa nada ahora. Si eres el único al cierre, ganas 1 ficha.',
-              }
-            : null
+            ? [
+                {
+                  key: 'spy',
+                  body: 'Jugaste el Espía. Si al cerrar la ronda eres el único con un Espía, ganas una ficha.',
+                },
+              ]
+            : []
         }
         onDismiss={() => setToast(false)}
       />
@@ -287,6 +291,28 @@ export function Gallery() {
           guess={guess}
           onTarget={setTarget}
           onGuess={setGuess}
+          left={Object.fromEntries(
+            CARDS.map((c) => [
+              c.value,
+              cardCounts({
+                players: seats.map((x) => ({ discards: [...x.discards] })) as never,
+                you: { hand },
+                faceUp: [],
+              })[c.value].left,
+            ]),
+          )}
+          info={
+            <CountsBox
+              counts={cardCounts({
+                players: seats.map((x) => ({ discards: [...x.discards] })) as never,
+                you: { hand },
+                faceUp: [],
+              })}
+              discards={[1, 1, 4]}
+              hand={hand}
+              showCounts={false}
+            />
+          }
           onAccuse={close}
           onCancel={close}
         />
