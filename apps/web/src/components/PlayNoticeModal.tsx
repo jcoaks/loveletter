@@ -1,18 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef } from 'react';
+import { prefersReducedMotion, useCountdown } from '../hooks/useCountdown';
 import { cardName } from '../lib/cards';
 import type { ResultFace, TableResult } from '../lib/results';
 import { Card } from './Card';
 import { Sheet } from './Sheet';
-
-const TICK_MS = 100;
-
-function prefersReducedMotion(): boolean {
-  try {
-    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  } catch {
-    return false;
-  }
-}
 
 function FaceRow({ faces }: { faces: readonly ResultFace[] }) {
   return (
@@ -42,43 +33,21 @@ export function PlayNoticeModal({
   notice: TableResult;
   actorName: string;
   targetName: string | null;
-  autoCloseMs: number | null;
+  /** Milisegundos hasta cerrarse solo (siempre se cierra; con cursor o foco encima se detiene). */
+  autoCloseMs: number;
   onContinue: () => void;
 }) {
   const other = notice.other;
-  const [elapsed, setElapsed] = useState(0);
-  const paused = useRef(false);
-  const done = useRef(false);
+  const rootRef = useRef<HTMLDivElement>(null);
   const reduced = useRef(prefersReducedMotion());
-  const close = useRef(onContinue);
-  close.current = onContinue;
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: un aviso nuevo reinicia la cuenta
-  useEffect(() => {
-    done.current = false;
-    setElapsed(0);
-    if (autoCloseMs === null) return;
-    const timer = window.setInterval(() => {
-      if (paused.current || done.current) return;
-      setElapsed((e) => e + TICK_MS);
-    }, TICK_MS);
-    return () => window.clearInterval(timer);
-  }, [notice.key, autoCloseMs]);
-
-  // Al llegar a cero se cierra una sola vez.
-  useEffect(() => {
-    if (autoCloseMs !== null && elapsed >= autoCloseMs && !done.current) {
-      done.current = true;
-      close.current();
-    }
-  }, [elapsed, autoCloseMs]);
+  const { elapsed, secondsLeft, pointer } = useCountdown({
+    ms: autoCloseMs,
+    resetKey: notice.key,
+    onDone: onContinue,
+    root: rootRef,
+  });
 
   if (!other) return null;
-  const left = autoCloseMs === null ? 0 : Math.max(0, Math.ceil((autoCloseMs - elapsed) / 1000));
-  const pause = (on: boolean) => () => {
-    paused.current = on;
-  };
-
   return (
     <Sheet
       label={notice.label}
@@ -94,14 +63,7 @@ export function PlayNoticeModal({
       tone={notice.hit ? 'hit' : 'default'}
       onClose={onContinue}
     >
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: solo pausa la cuenta atrás con el puntero y el foco */}
-      <div
-        className="grid gap-4"
-        onMouseEnter={pause(true)}
-        onMouseLeave={pause(false)}
-        onFocus={pause(true)}
-        onBlur={pause(false)}
-      >
+      <div className="grid gap-4" ref={rootRef} {...pointer}>
         <div className="flex flex-wrap items-center justify-center gap-5">
           <Card value={other.card} ariaLabel={`Carta jugada: ${notice.label}`} />
           <div className="grid min-w-[200px] flex-1 gap-2">
@@ -130,28 +92,26 @@ export function PlayNoticeModal({
           </section>
         )}
         <div className="ll-row2">
-          {autoCloseMs !== null && (
-            <div className="grid min-w-[160px] flex-1 items-center gap-1">
-              {!reduced.current && (
+          <div className="grid min-w-[160px] flex-1 items-center gap-1">
+            {!reduced.current && (
+              <div
+                role="progressbar"
+                aria-label="Tiempo hasta cerrarse"
+                aria-valuemin={0}
+                aria-valuemax={Math.round(autoCloseMs / 1000)}
+                aria-valuenow={secondsLeft}
+                className="h-1.5 overflow-hidden rounded-full bg-black/40"
+              >
                 <div
-                  role="progressbar"
-                  aria-label="Tiempo hasta cerrarse"
-                  aria-valuemin={0}
-                  aria-valuemax={Math.round(autoCloseMs / 1000)}
-                  aria-valuenow={left}
-                  className="h-1.5 overflow-hidden rounded-full bg-black/40"
-                >
-                  <div
-                    className="h-full bg-gold"
-                    style={{ width: `${Math.min(100, (elapsed / autoCloseMs) * 100)}%` }}
-                  />
-                </div>
-              )}
-              <span className="ll-lbl">Se cierra en {left} s</span>
-            </div>
-          )}
+                  className="h-full bg-gold"
+                  style={{ width: `${Math.min(100, (elapsed / autoCloseMs) * 100)}%` }}
+                />
+              </div>
+            )}
+            <span className="ll-lbl">Se cierra en {secondsLeft} s</span>
+          </div>
           <button type="button" className="ll-play" onClick={onContinue}>
-            Continuar
+            Entendido
           </button>
         </div>
       </div>

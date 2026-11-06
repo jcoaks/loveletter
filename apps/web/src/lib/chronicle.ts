@@ -100,7 +100,15 @@ export function playText(
     case 3: {
       const e = find(effects, 'baron');
       if (!e) return `${head}.`;
-      const base = `${head} contra ${ref(e.targetId)}`;
+      // Quien interviene ve las dos cartas (el motor solo se las manda a los dos).
+      const other = mine ? e.targetId : A;
+      const bothMine = e.secret?.hands?.[me];
+      const bothTheirs = e.secret?.hands?.[other];
+      const cards =
+        bothMine !== undefined && bothTheirs !== undefined
+          ? ` (tu ${cardName(bothMine)} contra ${mine ? 'su' : `el`} ${cardName(bothTheirs)}${mine ? '' : ` de ${nm(other)}`})`
+          : '';
+      const base = `${head} contra ${ref(e.targetId)}${cards}`;
       if (e.loserId === null || e.loserCard === null) return `${base}: empate, nadie queda fuera.`;
       const L = e.loserId;
       return `${base}: ${L === me ? 'tu mano' : `la mano de ${nm(L)}`} era la más baja (${cardName(e.loserCard)}) y ${out(L)}.`;
@@ -114,8 +122,11 @@ export function playText(
       const self = T === A;
       const who = self ? (mine ? 'ti' : agree('sí mismo', ctx.gender?.(A))) : ref(T);
       const dropped = `${T === me ? 'descartaste' : 'descartó'} ${withArticle(e.discarded)}`;
+      const fresh = find(effects, 'draw')?.secret?.drawn?.[0];
       const after =
-        e.discarded === 9 ? `y ${out(T)}` : `y ${T === me ? 'robaste' : 'robó'} una carta nueva`;
+        e.discarded === 9
+          ? `y ${out(T)}`
+          : `y ${T === me ? 'robaste' : 'robó'} ${T === me && fresh !== undefined ? withArticle(fresh) : 'una carta nueva'}`;
       return `${head} contra ${who}: ${dropped} ${after}.`;
     }
     case 6: {
@@ -132,8 +143,15 @@ export function playText(
       const e = find(effects, 'king');
       if (!e) return `${head}.`;
       const got = e.secret?.hands?.[me];
+      const gave = e.secret?.hands?.[mine ? e.targetId : A];
       const involved = e.playerId === me || e.targetId === me;
-      return `${head} contra ${ref(e.targetId)}: intercambiaron manos.${involved && got !== undefined ? ` Recibiste ${indefinite(got)}.` : ''}`;
+      const swap =
+        involved && got !== undefined
+          ? gave !== undefined
+            ? ` Entregaste ${indefinite(gave)} y recibiste ${indefinite(got)}.`
+            : ` Recibiste ${indefinite(got)}.`
+          : '';
+      return `${head} contra ${ref(e.targetId)}: intercambiaron manos.${swap}`;
     }
     case 8:
       return `${head}: sin efecto.`;
@@ -236,12 +254,28 @@ export function groupText(group: EventGroup, ctx: TextContext): string | null {
   }
 }
 
-/** Crónica en español, la más reciente primero. */
-export function chronicle(events: readonly GameEvent[], ctx: TextContext): string[] {
-  const lines: string[] = [];
+export interface LogLine {
+  text: string;
+  /** La línea cuenta algo que solo tú sabes (viene de `event.secret`): se marca "solo tú". */
+  secret: boolean;
+}
+
+const hasSecretForMe = (events: readonly GameEvent[], me: string) =>
+  events.some((e) => e.secret?.to.includes(me));
+
+/** Crónica con la marca de privacidad de cada línea, la más reciente primero. */
+export function chronicleLines(events: readonly GameEvent[], ctx: TextContext): LogLine[] {
+  const lines: LogLine[] = [];
   for (const group of groupEvents(events)) {
     const text = groupText(group, ctx);
-    if (text) lines.push(text);
+    if (!text) continue;
+    const source = group.kind === 'play' ? [group.play, ...group.effects] : [group.event];
+    lines.push({ text, secret: hasSecretForMe(source, ctx.me) });
   }
   return lines.reverse();
+}
+
+/** Crónica en español, la más reciente primero. */
+export function chronicle(events: readonly GameEvent[], ctx: TextContext): string[] {
+  return chronicleLines(events, ctx).map((l) => l.text);
 }

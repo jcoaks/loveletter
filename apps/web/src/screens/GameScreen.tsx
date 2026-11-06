@@ -22,7 +22,7 @@ import { useBotSpeech } from '../hooks/useBotSpeech';
 import { useDraws } from '../hooks/useDraws';
 import { useTableReady } from '../hooks/useTableReady';
 import { CARD_BY_VALUE, cardName } from '../lib/cards';
-import { chronicle, type TextContext } from '../lib/chronicle';
+import { chronicleLines, type TextContext } from '../lib/chronicle';
 import { buildResults, type ChancellorPick, type TableResult } from '../lib/results';
 import { pickerPlayers, seatsOf } from '../lib/seats';
 import type { NoticeMode } from '../lib/session';
@@ -35,8 +35,17 @@ import { RoundOverModal } from './special/RoundOver';
 
 type Flow = 'picker' | 'guard' | 'confirm' | null;
 
-/** Los avisos que no te afectan se cierran solos tras este tiempo. */
-const NOTICE_AUTO_MS = 5000;
+/** Todos los avisos de jugadas se cierran solos; cuanto más hay que leer, más tardan. */
+const NOTICE_PUBLIC_MS = 5000;
+const NOTICE_AFFECTS_MS = 8000;
+const NOTICE_SECRET_MS = 10000;
+
+const noticeMs = (r: TableResult): number =>
+  (r.secretFaces && r.secretFaces.length > 0) || r.visibility === 'private'
+    ? NOTICE_SECRET_MS
+    : r.other?.affectsMe
+      ? NOTICE_AFFECTS_MS
+      : NOTICE_PUBLIC_MS;
 
 /**
  * Resultados nuevos (tus jugadas y lo que otros te hacen). No repite lo ya visto al conectar.
@@ -219,7 +228,7 @@ export function GameScreen() {
   const text = turnText(game, nameOf);
   const picker = lp ? pickerPlayers(game, seats, lp.targets) : [];
   const restCard = lp && hand.length === 2 ? hand[hand.indexOf(lp.card) === 0 ? 1 : 0] : undefined;
-  const log = useMemo(() => chronicle(game.events, ctx), [game.events, ctx]);
+  const log = useMemo(() => chronicleLines(game.events, ctx), [game.events, ctx]);
   const toWin = game.tokensToWin;
   // Con el registro abierto todo cuenta como leído.
   useEffect(() => {
@@ -401,7 +410,7 @@ export function GameScreen() {
                 : ctx.name(current.other.targetId)
               : null
           }
-          autoCloseMs={current.other.affectsMe ? null : NOTICE_AUTO_MS}
+          autoCloseMs={noticeMs(current)}
           onContinue={results.dismiss}
         />
       )}
@@ -416,6 +425,8 @@ export function GameScreen() {
           faces={current.faces}
           visibility={current.visibility}
           hit={current.hit}
+          autoCloseMs={noticeMs(current)}
+          resetKey={current.key}
           onContinue={results.dismiss}
         />
       )}

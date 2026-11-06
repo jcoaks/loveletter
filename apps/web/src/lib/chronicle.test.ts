@@ -61,7 +61,7 @@ describe('crónica', () => {
     const self = play(rig({ hands: [[5, 2], [9], [4]] }), 5, 'p0');
     expect(chronicle(ev(self, 'p0'), ctxFor('p0'))[0]).toContain('contra ti');
     const king = play(rig({ hands: [[7, 2], [3], [4]] }), 7, 'p1');
-    expect(chronicle(ev(king, 'p0'), ctxFor('p0'))[0]).toContain('Recibiste un Barón');
+    expect(chronicle(ev(king, 'p0'), ctxFor('p0'))[0]).toContain('recibiste un Barón');
     expect(chronicle(ev(king, 'p2'), ctxFor('p2'))[0]).not.toContain('Recibiste');
     const chan = play(rig({ hands: [[6, 2], [3], [4]] }), 6);
     expect(chronicle(ev(chan, 'p0'), ctxFor('p0'))[0]).toContain('robaste');
@@ -249,7 +249,7 @@ describe('avisos de jugadas ajenas', () => {
   it('Rey y Sacerdote como objetivo; un tercero no ve nada secreto', () => {
     const king = play(rig({ hands: [[7, 1], [3], [4]] }), 7, 'p1');
     const [k] = notices(king, 'p1');
-    expect(k?.body).toContain('Recibiste un Guardia');
+    expect(k?.body).toContain('recibiste un Guardia');
     expect(k?.secretFaces).toContainEqual({ caption: 'Recibes', value: 1 });
     expect(k?.other?.affectsMe).toBe(true);
     const third = notices(king, 'p2')[0];
