@@ -41,7 +41,7 @@ const SEATS: SeatData[] = [
     name: 'Lucía',
     gender: 'f',
     handCount: 1,
-    discards: [1, 1],
+    discards: [1, 1, 1, 1, 5, 5],
     tokens: 1,
     isTurn: true,
   },

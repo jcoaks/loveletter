@@ -1,11 +1,11 @@
 import { formatRoomCode, type RoomPlayer, type RoomView } from '@loveletter/protocol';
 import { useState } from 'react';
+import { LogoLockup } from '../../components/LogoLockup';
 import { RulesModal } from '../../components/RulesContent';
 import { useCanAct, useRoom } from '../../hooks/room';
 import { TOKENS_TO_WIN } from '../../lib/cards';
 import { useRoomStore } from '../../store/room';
 import { useUiStore } from '../../store/ui';
-import { Logo } from './parts';
 
 async function copyText(text: string): Promise<boolean> {
   try {
@@ -39,7 +39,7 @@ export function LobbyScreen() {
   return (
     <main className="mx-auto grid max-w-[1000px] gap-6 px-4 py-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <Logo width={200} />
+        <LogoLockup height={36} />
         <div className="flex items-center gap-2">
           <button type="button" className="ll-ghost" onClick={() => openDialog('rules')}>
             Reglas

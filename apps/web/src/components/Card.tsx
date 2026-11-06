@@ -120,12 +120,15 @@ export function CardBack({ className = '', style }: { className?: string; style?
 export function CardFan({
   cards,
   className = '',
+  wrap = false,
 }: {
   cards: readonly CardValue[];
   className?: string;
+  /** En varias líneas y sin solape: nunca se sale de su contenedor. */
+  wrap?: boolean;
 }) {
   return (
-    <span className={`ll-fan ${className}`}>
+    <span className={`ll-fan${wrap ? ' wrap' : ''} ${className}`}>
       {cards.map((v, i) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: los descartes son una lista ordenada que solo crece
         <Card key={`${i}-${v}`} value={v} size="sm" />

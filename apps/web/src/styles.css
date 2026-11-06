@@ -435,6 +435,14 @@ body {
       padding: 6px 8px;
     }
   }
+  .ll-show-xs {
+    display: inline;
+  }
+  @media (min-width: 480px) {
+    .ll-show-xs {
+      display: none;
+    }
+  }
   .ll-hide-sm {
     display: none;
   }
@@ -546,9 +554,50 @@ body {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    justify-content: flex-end;
-    gap: 8px;
+    gap: 6px 8px;
     padding: 8px clamp(12px, 2vw, 20px) 0;
+  }
+  .ll-bar-logo {
+    font: inherit;
+    flex: none;
+    display: grid;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 4px;
+    background: none;
+    border: 0;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-right: auto;
+  }
+  .ll-bar-logo img {
+    height: 32px;
+  }
+  .ll-bar-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+  @media (max-width: 599px) {
+    .ll-bar-logo {
+      order: 1;
+    }
+    .ll-bar-logo img {
+      height: 26px;
+    }
+    .ll-bar > .ll-exit {
+      order: 2;
+    }
+    .ll-bar-actions {
+      order: 3;
+      flex: 1 0 100%;
+      justify-content: space-between;
+      gap: 6px;
+    }
+    .ll-bar .ll-ghost {
+      padding: 4px 10px;
+    }
   }
   .ll-bar .ll-ghost {
     position: relative;
@@ -970,6 +1019,14 @@ body {
     gap: 12px;
     align-items: flex-start;
   }
+  .ll-sh-hd .ll-lbl {
+    display: block;
+    margin-top: 2px;
+    font-size: 14px;
+    letter-spacing: 0;
+    text-transform: none;
+    line-height: 1.35;
+  }
   .ll-sh-hd h3 {
     margin: 0 0 4px;
     font-family: var(--font-display);
@@ -990,6 +1047,25 @@ body {
     justify-content: center;
     align-items: flex-start;
     justify-self: center;
+  }
+  /* Cartas reveladas: tamaño grande (el de la mano), escalado para que quepan en la ventana. */
+  .ll-faces.big {
+    --card-w-lg: clamp(104px, 24vw, 160px);
+    gap: 14px 18px;
+  }
+  .ll-faces.big.compact {
+    --card-w-lg: clamp(96px, 22vw, 132px);
+  }
+  .ll-faces.big[data-n="3"],
+  .ll-faces.big[data-n="4"] {
+    --card-w-lg: clamp(84px, 18vw, 132px);
+  }
+  .ll-faces.big[data-n="5"],
+  .ll-faces.big[data-n="6"] {
+    --card-w-lg: clamp(80px, 15vw, 112px);
+  }
+  .ll-faces.big .ll-dwrap {
+    max-width: var(--card-w-lg);
   }
   .ll-dwrap {
     display: grid;
@@ -1015,8 +1091,18 @@ body {
     text-align: center;
     justify-self: center;
   }
+  .ll-fan.wrap {
+    flex-wrap: wrap;
+    gap: 3px;
+    min-height: 0;
+    padding-left: 0;
+  }
+  .ll-fan.wrap > * + * {
+    margin-left: 0;
+  }
   .ll-ptiles {
     display: grid;
+    align-items: stretch;
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     gap: 12px;
   }
@@ -1027,7 +1113,7 @@ body {
     display: grid;
     gap: 8px;
     align-content: start;
-    padding: 12px;
+    padding: 10px;
     border-radius: 12px;
     border: 1px solid var(--color-gold);
     background: rgb(0 0 0 / 0.3);

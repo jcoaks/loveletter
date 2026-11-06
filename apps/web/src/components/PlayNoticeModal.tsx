@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { cardName } from '../lib/cards';
 import type { TableResult } from '../lib/results';
 import { Card } from './Card';
 import { Sheet } from './Sheet';
@@ -109,10 +110,10 @@ export function PlayNoticeModal({
           </div>
         </div>
         {notice.faces.length > 0 && (
-          <div className="ll-faces">
+          <div className="ll-faces big compact" data-n={notice.faces.length}>
             {notice.faces.map((f) => (
               <div key={`${f.caption}-${f.value}`} className="ll-dwrap">
-                <Card value={f.value} size="sm" />
+                <Card value={f.value} ariaLabel={`${f.caption}: ${cardName(f.value)}`} />
                 <span className="ll-lbl">{f.caption}</span>
               </div>
             ))}

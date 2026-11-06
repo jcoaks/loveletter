@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { CardValue } from '../lib/cards';
+import { type CardValue, cardName } from '../lib/cards';
 import { Card } from './Card';
 import { Sheet } from './Sheet';
 
@@ -45,10 +45,10 @@ export function ResultModal({
     >
       <p className="ll-rtxt">{body}</p>
       {faces.length > 0 && (
-        <div className="ll-faces">
+        <div className="ll-faces big" data-n={faces.length}>
           {faces.map((f) => (
             <div key={`${f.caption}-${f.value}`} className="ll-dwrap">
-              <Card value={f.value} size="sm" />
+              <Card value={f.value} ariaLabel={`${f.caption}: ${cardName(f.value)}`} />
               <span className="ll-lbl">{f.caption}</span>
             </div>
           ))}

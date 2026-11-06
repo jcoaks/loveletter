@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { type CardValue, cardName } from '../lib/cards';
 import { agree, type Gender } from '../lib/gender';
-import { labelName } from '../lib/names';
+import { labelName, plural } from '../lib/names';
 import { CardFan } from './Card';
 import { Sheet } from './Sheet';
 import { Tokens } from './Token';
@@ -19,11 +19,11 @@ export interface PickerPlayer {
 }
 
 const PROMPT: Partial<Record<CardValue, string>> = {
-  1: 'Elige a quién acusar.',
-  2: 'Elige de quién mirar la mano.',
-  3: 'Elige con quién comparar manos.',
-  5: 'Elige quién descarta su mano y roba.',
-  7: 'Elige con quién intercambiar manos.',
+  1: 'Elige a quién acusar',
+  2: 'Elige de quién mirar la mano',
+  3: 'Elige con quién comparar manos',
+  5: 'Elige quién descarta su mano y roba',
+  7: 'Elige con quién intercambiar manos',
 };
 const SUB: Partial<Record<CardValue, string>> = {
   1: 'Acusarlo de tener una carta',
@@ -66,8 +66,8 @@ export function PlayerPickerModal({
   return (
     <Sheet
       label={`Elegir jugador: ${name}`}
-      title={`${name}: ${PROMPT[card] ?? 'Elige un jugador.'}`}
-      sub={`Protegidos y eliminados no se pueden elegir.${prince ? ' Puedes elegirte. Si el elegido descarta la Princesa, queda fuera.' : ''}`}
+      title={name}
+      sub={`${PROMPT[card] ?? 'Elige un jugador'}. Protegidos y eliminados no se pueden elegir.${prince ? ' Puedes elegirte; si el elegido descarta la Princesa, queda fuera.' : ''}`}
       onClose={onCancel}
       footer={
         <>
@@ -93,7 +93,12 @@ export function PlayerPickerModal({
               <>
                 <b>{labelName(p.name, p.isMe)}</b>
                 <span className="ll-lbl">{sub}</span>
-                <CardFan cards={p.discards} />
+                <span className="ll-lbl">
+                  {p.discards.length === 0
+                    ? 'Sin descartes'
+                    : plural(p.discards.length, 'descarte', 'descartes')}
+                </span>
+                <CardFan cards={p.discards} wrap />
                 <Tokens count={p.tokens} total={toWin} />
               </>
             );

@@ -7,6 +7,7 @@ import { GuardModal } from '../components/GuessPicker';
 import { GuideModal } from '../components/GuideModal';
 import { HandRow } from '../components/HandRow';
 import { LogModal } from '../components/LogModal';
+import { LogoLockup } from '../components/LogoLockup';
 import { PlayerPickerModal } from '../components/PlayerPickerModal';
 import { PlayNoticeModal } from '../components/PlayNoticeModal';
 import { ResultModal } from '../components/ResultModal';
@@ -269,40 +270,56 @@ export function GameScreen() {
         {current ? `${current.title}. ${current.body}` : text}
       </div>
       <div className="ll-game">
-        <div className="ll-bar" role="toolbar" aria-label="Opciones de la partida">
-          <button type="button" className="ll-ghost" onClick={() => openDialog('rules')}>
-            Reglas
-          </button>
+        <div className="ll-bar">
           <button
             type="button"
-            className="ll-ghost"
-            onClick={() => {
-              setReadCount(log.length);
-              setLogOpen(true);
-            }}
+            className="ll-bar-logo"
+            aria-label="Love Letter: salir al inicio"
+            onClick={() => openDialog('leave')}
           >
-            Registro
-            {unread > 0 && (
-              <span className="ll-badge" role="img" aria-label={`${unread} sin leer`}>
-                {unread}
-              </span>
-            )}
+            <LogoLockup />
           </button>
-          <button type="button" className="ll-ghost ll-hide-lg" onClick={() => openDialog('guide')}>
-            Carta guía
-          </button>
-          <button
-            type="button"
-            className="ll-ghost"
-            role="switch"
-            aria-label={`Avisos de jugadas: ${noticeMode === 'full' ? 'completos' : 'breves'}`}
-            aria-checked={noticeMode === 'full'}
-            onClick={() => setNoticeMode(noticeMode === 'full' ? 'brief' : 'full')}
-          >
-            Avisos<span className="ll-hide-sm"> de jugadas</span>:{' '}
-            {noticeMode === 'full' ? 'completos' : 'breves'}
-          </button>
-          <button type="button" className="ll-ghost" onClick={() => openDialog('leave')}>
+          <div className="ll-bar-actions" role="toolbar" aria-label="Opciones de la partida">
+            <button type="button" className="ll-ghost" onClick={() => openDialog('rules')}>
+              Reglas
+            </button>
+            <button
+              type="button"
+              className="ll-ghost"
+              onClick={() => {
+                setReadCount(log.length);
+                setLogOpen(true);
+              }}
+            >
+              Registro
+              {unread > 0 && (
+                <span className="ll-badge" role="img" aria-label={`${unread} sin leer`}>
+                  {unread}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              className="ll-ghost ll-hide-lg"
+              aria-label="Carta guía"
+              onClick={() => openDialog('guide')}
+            >
+              <span className="ll-hide-sm">Carta guía</span>
+              <span className="ll-show-xs">Guía</span>
+            </button>
+            <button
+              type="button"
+              className="ll-ghost"
+              role="switch"
+              aria-label={`Avisos de jugadas: ${noticeMode === 'full' ? 'completos' : 'breves'}`}
+              aria-checked={noticeMode === 'full'}
+              onClick={() => setNoticeMode(noticeMode === 'full' ? 'brief' : 'full')}
+            >
+              Avisos<span className="ll-hide-sm"> de jugadas</span>:{' '}
+              {noticeMode === 'full' ? 'completos' : 'breves'}
+            </button>
+          </div>
+          <button type="button" className="ll-ghost ll-exit" onClick={() => openDialog('leave')}>
             Salir
           </button>
         </div>

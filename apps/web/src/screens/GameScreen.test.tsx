@@ -166,7 +166,10 @@ describe('GameScreen: resultados', () => {
     await playAndSee(rig({ hands: [[2, 7], [3], [4]] }), 2, 'p1');
     const d = within(await screen.findByRole('dialog', { name: 'Resultado: Sacerdote' }));
     expect(d.getByText('Privado · solo tú lo ves')).toBeInTheDocument();
-    expect(d.getByRole('img', { name: 'Barón' })).toBeInTheDocument();
+    const face = d.getByRole('img', { name: 'Beto: Barón' });
+    // Carta grande con arte, nombre y efecto; nunca la pequeña.
+    expect(face).not.toHaveClass('sm');
+    expect(face).toHaveTextContent('Barón');
   });
 
   it('Guardia y Barón son públicos', async () => {
@@ -493,5 +496,50 @@ describe('GameScreen: avisos de jugadas ajenas', () => {
     mount(rig({ hands: [[1, 2], [3], [4]], discards: { 0: [4, 5] } }));
     expect(screen.getByRole('button', { name: /^Tus descartes: 2/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Jugar Guardia' })).toBeInTheDocument();
+  });
+});
+
+describe('GameScreen: elegir jugador y logo', () => {
+  it('título corto, instrucción como subtítulo y descartes contados dentro de la tarjeta', async () => {
+    const { user } = mount(rig({ hands: [[3, 2], [5], [4]], discards: { 1: [1, 1, 1, 1, 5, 5] } }));
+    await user.click(screen.getByRole('button', { name: /^3, Barón/ }));
+    await user.click(screen.getByRole('button', { name: 'Jugar Barón' }));
+    const d = within(dialog());
+    expect(d.getByRole('heading', { name: 'Barón' })).toBeInTheDocument();
+    expect(d.getByText(/^Elige con quién comparar manos\. Protegidos/)).toBeInTheDocument();
+    const tile = d.getByRole('button', { name: /Beto/ });
+    expect(within(tile).getByText('6 descartes')).toBeInTheDocument();
+    const fan = tile.querySelector('.ll-fan');
+    expect(fan).toHaveClass('wrap');
+    expect(fan?.querySelectorAll('.ll-card')).toHaveLength(6);
+    expect(
+      within(d.getByRole('button', { name: /Carla/ })).getByText('Sin descartes'),
+    ).toBeInTheDocument();
+  });
+
+  it('el logo de la barra abre el diálogo de salir', async () => {
+    const { user } = mount(rig({ hands: [[1, 2], [3], [4]] }));
+    expect(screen.getByRole('img', { name: 'Love Letter' })).toHaveAttribute(
+      'src',
+      '/assets/logo-lockup.webp',
+    );
+    await user.click(screen.getByRole('button', { name: 'Love Letter: salir al inicio' }));
+    expect(screen.getByRole('alertdialog', { name: 'Salir de la sala' })).toBeInTheDocument();
+  });
+
+  it('las caras del aviso de jugada ajena también son grandes', async () => {
+    const before = rig({ hands: [[7, 1], [3], [4]] });
+    const after = step(before, { type: 'play_card', playerId: 'p0', card: 7, targetId: 'p1' });
+    const fns = { act: vi.fn(() => true), send: vi.fn(() => true) };
+    seed(before, 'p1', fns);
+    render(
+      <MemoryRouter>
+        <GameScreen />
+      </MemoryRouter>,
+    );
+    rtlAct(() => seed(after, 'p1', fns));
+    const d = within(await screen.findByRole('dialog', { name: 'Jugada de Ana: Rey' }));
+    const recibes = d.getByRole('img', { name: 'Recibes: Guardia' });
+    expect(recibes).not.toHaveClass('sm');
   });
 });

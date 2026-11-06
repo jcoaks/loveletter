@@ -29,10 +29,10 @@ export function RoundSummaryBody({ game, summary }: { game: PlayerView; summary:
           ` ${name(summary.spyBonusId)} gana 1 ficha extra por el Espía.`}
       </p>
       {hands.length > 0 && (
-        <div className="ll-faces">
+        <div className="ll-faces big compact" data-n={hands.length}>
           {hands.map(([id, value]) => (
             <div key={id} className="ll-dwrap">
-              <Card value={value} size="sm" ariaLabel={`${name(id)}: ${cardName(value)}`} />
+              <Card value={value} ariaLabel={`${name(id)}: ${cardName(value)}`} />
               <span className="ll-lbl">{name(id)}</span>
             </div>
           ))}
