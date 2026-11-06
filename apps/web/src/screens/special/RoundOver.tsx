@@ -3,7 +3,7 @@ import { Card } from '../../components/Card';
 import { Sheet } from '../../components/Sheet';
 import { Tokens } from '../../components/Token';
 import { cardName } from '../../lib/cards';
-import { listNames, reasonText } from '../../lib/chronicle';
+import { listNames, roundVerdict } from '../../lib/chronicle';
 
 /** Nombre de un jugador; "Tú" para ti. */
 export function nameFn(game: PlayerView) {
@@ -11,47 +11,46 @@ export function nameFn(game: PlayerView) {
     id === game.you.id ? 'Tú' : (game.players.find((p) => p.id === id)?.name ?? '¿?');
 }
 
-export function summaryTitle(summary: RoundSummary, name: (id: string) => string): string {
-  const names = summary.winnerIds.map(name);
-  if (summary.reason === 'shared_tie') return `Empate: ganan ${listNames(names)}`;
-  return names.length > 1 ? `Ganan la ronda ${listNames(names)}` : `Gana la ronda ${names[0]}`;
+/** Textos de la vista: nombres reales y segunda persona cuando eres tú. */
+export function verdictFor(game: PlayerView, summary: RoundSummary) {
+  return roundVerdict(summary, {
+    me: game.you.id,
+    name: (id) => game.players.find((p) => p.id === id)?.name ?? '¿?',
+  });
 }
 
-/** La carta apartada al empezar la ronda, que gira de reverso a cara. */
-function SetAsideReveal({ value }: { value: CardValue }) {
+export function summaryTitle(game: PlayerView, summary: RoundSummary): string {
+  return verdictFor(game, summary).title;
+}
+
+/** La carta apartada: un dato discreto, en una línea; al pasar el cursor o enfocar se amplía. */
+function SetAsideNote({ value }: { value: CardValue }) {
+  const label = `Carta apartada: ${cardName(value)}`;
   return (
-    <section
-      aria-label="Carta apartada"
-      className="flex flex-wrap items-center justify-center gap-4 rounded-xl border border-gold/30 bg-black/20 p-3"
-    >
-      <div className="ll-faces big compact" data-n={1}>
-        <div className="ll-dwrap">
-          <div className="ll-flip">
-            <div className="ll-flip-in">
-              <span className="ll-flip-back" aria-hidden="true" />
-              <Card value={value} ariaLabel={`Carta apartada: ${cardName(value)}`} />
-            </div>
-          </div>
-        </div>
-      </div>
-      <div className="min-w-[160px] flex-1">
-        <h4 className="m-0 font-display text-lg tracking-wider">Carta apartada</h4>
-        <p className="m-0 mt-1 text-ivory/85">La que se apartó boca abajo al empezar la ronda</p>
-      </div>
+    <section aria-label="Carta apartada" className="ll-aside-row">
+      <button type="button" className="ll-aside" title="Ampliar">
+        <Card value={value} size="sm" ariaLabel={label} />
+        <span className="ll-aside-pop" aria-hidden="true">
+          <Card value={value} ariaLabel="" />
+        </span>
+      </button>
+      <span className="ll-lbl" style={{ textTransform: 'none', letterSpacing: 0, fontSize: 14 }}>
+        {label}
+      </span>
     </section>
   );
 }
 
-/** Resumen de la ronda: ganador, motivo, manos reveladas, fichas y bonificación del Espía. */
+/** Resumen de la ronda: motivo, manos reveladas, fichas, bonificación del Espía y carta apartada. */
 export function RoundSummaryBody({ game, summary }: { game: PlayerView; summary: RoundSummary }) {
   const name = nameFn(game);
+  const verdict = verdictFor(game, summary);
   const hands = summary.revealedHands ? Object.entries(summary.revealedHands) : [];
   return (
     <div className="grid gap-3">
       <p className="ll-rtxt">
-        {summary.winnerIds.map(name).join(', ')}: {reasonText(summary)}.
-        {summary.spyBonusId !== null &&
-          ` ${name(summary.spyBonusId)} gana 1 ficha extra por el Espía.`}
+        {verdict.reason}
+        {verdict.bonus ? ` ${verdict.bonus}` : ''}
       </p>
       {hands.length > 0 && (
         <div className="ll-faces big compact" data-n={hands.length}>
@@ -62,10 +61,6 @@ export function RoundSummaryBody({ game, summary }: { game: PlayerView; summary:
             </div>
           ))}
         </div>
-      )}
-      {/* Falta en salas creadas antes de que el motor la guardara: entonces no se muestra nada. */}
-      {summary.setAside !== undefined && summary.setAside !== null && (
-        <SetAsideReveal value={summary.setAside} />
       )}
       {summary.discardTotals && (
         <p className="ll-lbl" style={{ margin: 0 }}>
@@ -89,6 +84,10 @@ export function RoundSummaryBody({ game, summary }: { game: PlayerView; summary:
           );
         })}
       </ul>
+      {/* Falta en salas creadas antes de que el motor la guardara: entonces no se muestra nada. */}
+      {summary.setAside !== undefined && summary.setAside !== null && (
+        <SetAsideNote value={summary.setAside} />
+      )}
     </div>
   );
 }
@@ -112,7 +111,7 @@ export function RoundOverModal({
   return (
     <Sheet
       label={`Fin de la ronda ${summary.round}`}
-      title={summaryTitle(summary, name)}
+      title={summaryTitle(game, summary)}
       sub={`Fin de la ronda ${summary.round} · público`}
       onClose={onHide}
       wide

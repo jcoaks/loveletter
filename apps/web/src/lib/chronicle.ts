@@ -142,31 +142,66 @@ export function playText(
   }
 }
 
-export function reasonText(summary: RoundSummary): string {
+/**
+ * Cómo se cuenta el final de una ronda a quien lo lee: `title` (quién gana) y `reason` (por qué),
+ * en segunda persona si ganas tú ("Ganaste la ronda", "Fuiste el último jugador en pie").
+ */
+export function roundVerdict(
+  summary: RoundSummary,
+  ctx: TextContext,
+): { title: string; reason: string; bonus: string | null } {
+  const { me } = ctx;
+  const winners = summary.winnerIds;
+  const meWon = winners.includes(me);
+  const others = winners.filter((id) => id !== me).map((id) => ctx.name(id));
+  const tie = summary.reason === 'shared_tie' || winners.length > 1;
+  const first = ctx.name(winners[0] ?? '');
+
+  let title: string;
+  if (tie) {
+    const pre = summary.reason === 'shared_tie' ? 'Empate: ' : '';
+    title = meWon
+      ? `${pre}tú y ${listNames(others)} ganan la ronda`
+      : `${pre ? `${pre}ganan ` : 'Ganan la ronda '}${listNames(others)}`;
+    title = title.charAt(0).toUpperCase() + title.slice(1);
+  } else {
+    title = meWon ? 'Ganaste la ronda' : `Gana la ronda ${first}`;
+  }
+
+  let reason: string;
   switch (summary.reason) {
     case 'last_standing':
-      return 'fue el último jugador en pie';
+      reason = meWon
+        ? 'Fuiste el último jugador en pie.'
+        : `${first} fue el último jugador en pie.`;
+      break;
     case 'highest_hand':
-      return 'se acabó el mazo y tenía la mano más alta';
+      reason = meWon
+        ? 'Se acabó el mazo y tenías la mano más alta.'
+        : `Se acabó el mazo y ${first} tenía la mano más alta.`;
+      break;
     case 'discard_tiebreak':
-      return 'empató en la mano más alta y ganó por la mayor suma de descartes';
+      reason = meWon
+        ? 'Empataste en la mano más alta y ganaste por la mayor suma de descartes.'
+        : `${first} empató en la mano más alta y ganó por la mayor suma de descartes.`;
+      break;
     case 'shared_tie':
-      return 'empate total: ganan todos los empatados';
+      reason = 'Empate total: ganan todos los empatados.';
+      break;
   }
+  const spy = summary.spyBonusId;
+  const bonus =
+    spy === null
+      ? null
+      : spy === me
+        ? 'Ganas 1 ficha extra por el Espía.'
+        : `${ctx.name(spy)} gana 1 ficha extra por el Espía.`;
+  return { title, reason, bonus };
 }
 
 export function roundEndText(summary: RoundSummary, ctx: TextContext): string {
-  const names = summary.winnerIds.map((id) => (id === ctx.me ? 'Tú' : ctx.name(id)));
-  const plural = names.length > 1;
-  const bonus =
-    summary.spyBonusId !== null
-      ? ` ${summary.spyBonusId === ctx.me ? 'Tú ganas' : `${ctx.name(summary.spyBonusId)} gana`} 1 ficha extra por el Espía.`
-      : '';
-  const why =
-    summary.reason === 'shared_tie'
-      ? 'empate total, ganan todos los empatados'
-      : reasonText(summary);
-  return `Fin de la ronda ${summary.round}: ${plural ? 'ganan' : 'gana'} ${listNames(names)} (${plural && summary.reason !== 'shared_tie' ? why.replace('fue', 'fueron') : why}).${bonus}`;
+  const v = roundVerdict(summary, ctx);
+  return `Fin de la ronda ${summary.round}: ${v.title}. ${v.reason}${v.bonus ? ` ${v.bonus}` : ''}`;
 }
 
 /** Línea de la crónica de un grupo, o null si no merece línea. */

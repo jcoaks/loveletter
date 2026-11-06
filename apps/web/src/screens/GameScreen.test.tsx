@@ -251,8 +251,8 @@ describe('GameScreen: fin de ronda y de partida', () => {
     // Primero el resultado de tu jugada.
     await user.click(await screen.findByRole('button', { name: 'Continuar' }));
     const d = within(await screen.findByRole('dialog', { name: 'Fin de la ronda 1' }));
-    expect(d.getByText('Gana la ronda Tú')).toBeInTheDocument();
-    expect(d.getByText(/fue el último jugador en pie/)).toBeInTheDocument();
+    expect(d.getByRole('heading', { name: 'Ganaste la ronda' })).toBeInTheDocument();
+    expect(d.getByText('Fuiste el último jugador en pie.')).toBeInTheDocument();
     expect(d.getByText('+1')).toBeInTheDocument();
     await user.click(d.getByRole('button', { name: 'Continuar' }));
     expect(act).toHaveBeenCalledWith({ type: 'continue_round' });

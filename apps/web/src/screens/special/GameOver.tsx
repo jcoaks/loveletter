@@ -27,7 +27,9 @@ export function GameOverModal({
   const farewells = room.chat.filter((c) => c.final);
   const title =
     winners.length > 1
-      ? `Empate: ganan ${listNames(winners.map(name))}`
+      ? winners.includes(game.you.id)
+        ? `Empate: tú y ${listNames(winners.filter((id) => id !== game.you.id).map(name))} ganan la partida`
+        : `Empate: ganan ${listNames(winners.map(name))}`
       : winners[0] === game.you.id
         ? '¡Ganaste la partida!'
         : `¡${name(winners[0] ?? '')} gana la partida!`;
