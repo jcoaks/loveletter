@@ -82,6 +82,11 @@ export function PlayNoticeModal({
             <p className="ll-rtxt" style={{ textAlign: 'left' }} role="status">
               {notice.body}
             </p>
+            {notice.effect && (
+              <p className="ll-fxline">
+                <span className="ll-lbl">Qué hace</span> {notice.effect}
+              </p>
+            )}
           </div>
         </div>
         {notice.faces.length > 0 && <FaceRow faces={notice.faces} />}

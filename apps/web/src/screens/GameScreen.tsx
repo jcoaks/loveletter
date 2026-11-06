@@ -15,12 +15,13 @@ import { ResultModal } from '../components/ResultModal';
 import { RulesModal } from '../components/RulesContent';
 import { MineBar } from '../components/SeatCard';
 import { TableLayout } from '../components/TableLayout';
-import { ToastStack } from '../components/ToastStack';
+import { TOAST_MS, ToastStack } from '../components/ToastStack';
 import { TurnBanner } from '../components/TurnBanner';
 import { useCanAct, useGame, useRoom } from '../hooks/room';
 import { useBotSpeech } from '../hooks/useBotSpeech';
 import { useDraws } from '../hooks/useDraws';
 import { useTableReady } from '../hooks/useTableReady';
+import { effectExtraMs } from '../lib/cardFx';
 import { CARD_BY_VALUE, cardName } from '../lib/cards';
 import { chronicleLines, type TextContext } from '../lib/chronicle';
 import { buildResults, type ChancellorPick, type TableResult } from '../lib/results';
@@ -40,12 +41,15 @@ const NOTICE_PUBLIC_MS = 5000;
 const NOTICE_AFFECTS_MS = 8000;
 const NOTICE_SECRET_MS = 10000;
 
-const noticeMs = (r: TableResult): number =>
+const noticeBase = (r: TableResult): number =>
   (r.secretFaces && r.secretFaces.length > 0) || r.visibility === 'private'
     ? NOTICE_SECRET_MS
     : r.other?.affectsMe
       ? NOTICE_AFFECTS_MS
       : NOTICE_PUBLIC_MS;
+
+/** Tiempo del aviso: según lo que hay que leer, más un poco si añade una frase larga de "qué hace". */
+const noticeMs = (r: TableResult): number => noticeBase(r) + effectExtraMs(r.effect ?? '');
 
 /**
  * Resultados nuevos (tus jugadas y lo que otros te hacen). No repite lo ya visto al conectar.
@@ -347,7 +351,16 @@ export function GameScreen() {
           </button>
           <ToastStack
             anchored
-            items={results.toasts.map((r) => ({ key: r.key, body: r.body }))}
+            items={results.toasts.map((r) => ({
+              key: r.key,
+              ms: TOAST_MS + effectExtraMs(r.effect ?? ''),
+              body: (
+                <>
+                  {r.body}
+                  {r.effect && <small className="ll-toast-fx">Qué hace: {r.effect}</small>}
+                </>
+              ),
+            }))}
             onDismiss={results.dismissToast}
           />
         </div>

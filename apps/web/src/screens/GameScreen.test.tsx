@@ -594,13 +594,31 @@ describe('GameScreen: avisos de tus jugadas triviales', () => {
     return fns;
   }
 
-  it.each<[CardValue, string, string]>([
-    [0, 'Tú jugaste el Espía', 'Jugaste el Espía.'],
-    [4, 'Tú jugaste la Doncella', 'Jugaste la Doncella: quedas protegido hasta tu próximo turno.'],
-    [8, 'Tú jugaste la Condesa', 'Jugaste la Condesa: sin efecto.'],
+  it.each<[CardValue, string, string, string, number]>([
+    [
+      0,
+      'Tú jugaste el Espía',
+      'Jugaste el Espía.',
+      'eres el único jugador en pie que jugó un Espía, ganas 1 ficha',
+      7,
+    ],
+    [
+      4,
+      'Tú jugaste la Doncella',
+      'Jugaste la Doncella: quedas protegido hasta tu próximo turno.',
+      'Nadie puede elegirte con una carta hasta tu próximo turno.',
+      5,
+    ],
+    [
+      8,
+      'Tú jugaste la Condesa',
+      'Jugaste la Condesa: sin efecto.',
+      'Se juega a la fuerza si se tiene el Rey o el Príncipe, o como farol',
+      7,
+    ],
   ])(
-    'carta %i, modo completo: ventana con la carta grande y cierre solo',
-    async (card, title, text) => {
+    'carta %i, modo completo: ventana con la carta grande, "qué hace" y cierre solo',
+    async (card, title, text, fx, secs) => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
       const before = rig({ hands: [[card, 2], [3], [5]] });
       const fns = startWith(before);
@@ -609,10 +627,12 @@ describe('GameScreen: avisos de tus jugadas triviales', () => {
       expect(d.getByRole('heading', { name: title })).toBeInTheDocument();
       expect(d.getByText(text, { selector: 'p' })).toBeInTheDocument();
       expect(d.getByText('Público')).toBeInTheDocument();
-      expect(d.getByText('Se cierra en 5 s')).toBeInTheDocument();
-      // Sin el texto explicativo de la regla del Espía.
-      expect(d.queryByText(/Si al cerrar la ronda/)).toBeNull();
-      await rtlAct(() => vi.advanceTimersByTimeAsync(5600));
+      // La segunda línea, atenuada, con lo que hace la carta (en segunda persona).
+      expect(d.getByText('Qué hace')).toBeInTheDocument();
+      expect(d.getByText(new RegExp(fx))).toBeInTheDocument();
+      // Las frases largas suman tiempo de lectura.
+      expect(d.getByText(`Se cierra en ${secs} s`)).toBeInTheDocument();
+      await rtlAct(() => vi.advanceTimersByTimeAsync(secs * 1000 + 600));
       expect(screen.queryByRole('dialog')).toBeNull();
     },
   );
@@ -626,7 +646,9 @@ describe('GameScreen: avisos de tus jugadas triviales', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Continuar' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Cerrar aviso' })).toBeInTheDocument();
-    await rtlAct(() => vi.advanceTimersByTimeAsync(5000));
+    // También lleva "qué hace", en pequeño.
+    expect(screen.getByText(/Qué hace: No tiene efecto ahora/)).toBeInTheDocument();
+    await rtlAct(() => vi.advanceTimersByTimeAsync(6500));
     expect(screen.queryByText('Jugaste el Espía.')).toBeNull();
   });
 
@@ -730,5 +752,90 @@ describe('GameScreen: la información privada queda en el registro', () => {
     expect(log.getByText('Ana jugó el Rey contra Beto: intercambiaron manos.')).toBeInTheDocument();
     expect(log.queryByText(/Entregaste|recibiste/)).toBeNull();
     expect(log.queryByText('solo tú')).toBeNull();
+  });
+});
+
+describe('GameScreen: "qué hace" la carta en el aviso', () => {
+  const texts: Record<number, RegExp> = {
+    0: /Si al cerrar la ronda es el único jugador en pie que jugó un Espía, gana 1 ficha/,
+    1: /Adivina la carta de otro jugador; si acierta, queda fuera/,
+    2: /Mira la mano de otro jugador/,
+    3: /la más baja queda fuera; si empatan, nadie/,
+    4: /Nadie puede elegirlo con una carta hasta su próximo turno/,
+    5: /descarta su mano y roba/,
+    7: /Intercambia su mano con la de otro jugador/,
+    8: /Se juega a la fuerza si se tiene el Rey o el Príncipe, o como farol/,
+  };
+
+  it.each(Object.keys(texts).map(Number) as CardValue[])(
+    'jugada ajena de la carta %i',
+    async (card) => {
+      const before = rig({ hands: [[card, 2], [3], [5]] });
+      const fns = { act: vi.fn(() => true), send: vi.fn(() => true) };
+      seed(before, 'p2', fns);
+      render(
+        <MemoryRouter>
+          <GameScreen />
+        </MemoryRouter>,
+      );
+      const target = [1, 2, 3, 5, 7].includes(card) ? 'p1' : undefined;
+      rtlAct(() => seed(play(before, card, target, card === 1 ? 5 : undefined), 'p2', fns));
+      const d = within(await screen.findByRole('dialog', { name: /^Jugada de Ana/ }));
+      expect(d.getByText('Qué hace')).toBeInTheDocument();
+      expect(d.getByText(texts[card] as RegExp)).toBeInTheDocument();
+    },
+  );
+
+  it('Canciller y Princesa también la llevan', async () => {
+    for (const [card, rx] of [
+      [6, /Roba 2 cartas, conserva 1/],
+      [9, /Quien la descarta queda fuera/],
+    ] as const) {
+      const before = rig({ hands: [[card, 2], [3], [5]] });
+      const fns = { act: vi.fn(() => true), send: vi.fn(() => true) };
+      seed(before, 'p2', fns);
+      render(
+        <MemoryRouter>
+          <GameScreen />
+        </MemoryRouter>,
+      );
+      rtlAct(() => seed(play(before, card), 'p2', fns));
+      const d = within(await screen.findByRole('dialog', { name: /^Jugada de Ana/ }));
+      expect(d.getByText(rx)).toBeInTheDocument();
+      cleanup();
+    }
+  });
+
+  it('en el Registro solo el Espía lleva lo que hace', async () => {
+    const before = rig({ hands: [[0, 2], [3], [5]] });
+    const fns = { act: vi.fn(() => true), send: vi.fn(() => true) };
+    seed(before, 'p2', fns);
+    render(
+      <MemoryRouter>
+        <GameScreen />
+      </MemoryRouter>,
+    );
+    rtlAct(() => seed(play(before, 0), 'p2', fns));
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'Entendido' }));
+    await userEvent.setup().click(screen.getByRole('button', { name: /^Registro/ }));
+    const log = within(screen.getByRole('dialog', { name: 'Registro de jugadas' }));
+    expect(log.getByText(/^Ana jugó el Espía\. No tiene efecto ahora/)).toBeInTheDocument();
+    await userEvent.setup().keyboard('{Escape}');
+    cleanup();
+    const b2 = rig({ hands: [[4, 2], [3], [5]] });
+    seed(b2, 'p2', fns);
+    render(
+      <MemoryRouter>
+        <GameScreen />
+      </MemoryRouter>,
+    );
+    rtlAct(() => seed(play(b2, 4), 'p2', fns));
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'Entendido' }));
+    await userEvent.setup().click(screen.getByRole('button', { name: /^Registro/ }));
+    const log2 = within(screen.getByRole('dialog', { name: 'Registro de jugadas' }));
+    expect(
+      log2.getByText('Ana jugó la Doncella: queda protegido hasta su próximo turno.'),
+    ).toBeInTheDocument();
+    expect(log2.queryByText(/Nadie puede elegirlo/)).toBeNull();
   });
 });

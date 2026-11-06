@@ -1,4 +1,5 @@
 import type { CardValue, GameEvent, RoundSummary } from '@loveletter/engine';
+import { effectLine } from './cardFx';
 import { CARD_BY_VALUE, cardName, withArticle } from './cards';
 import { agree, type Gender } from './gender';
 
@@ -267,8 +268,12 @@ const hasSecretForMe = (events: readonly GameEvent[], me: string) =>
 export function chronicleLines(events: readonly GameEvent[], ctx: TextContext): LogLine[] {
   const lines: LogLine[] = [];
   for (const group of groupEvents(events)) {
-    const text = groupText(group, ctx);
+    let text = groupText(group, ctx);
     if (!text) continue;
+    // El Registro sigue compacto: solo el Espía lleva lo que hace (su regla es la menos evidente).
+    if (group.kind === 'play' && group.play.card === 0) {
+      text = `${text} ${effectLine(0, group.play.playerId === ctx.me)}`;
+    }
     const source = group.kind === 'play' ? [group.play, ...group.effects] : [group.event];
     lines.push({ text, secret: hasSecretForMe(source, ctx.me) });
   }

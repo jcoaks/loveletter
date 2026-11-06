@@ -1,4 +1,5 @@
 import type { CardValue, GameEvent } from '@loveletter/engine';
+import { effectLine } from './cardFx';
 import { cardName, withArticle } from './cards';
 import { type EventGroup, groupEvents, playText, type TextContext } from './chronicle';
 
@@ -19,6 +20,8 @@ export interface TableResult {
   visibility: 'private' | 'public';
   /** Alguien quedó fuera. */
   hit: boolean;
+  /** "Qué hace" la carta jugada, en una frase corta (en espejo para quien la juega). */
+  effect?: string;
   /** Lo que solo tú ves de esta jugada (Sacerdote, Rey, Barón, Príncipe sobre ti). */
   secretFaces?: ResultFace[];
   /** Presente cuando es la jugada de otro jugador (aviso informativo). */
@@ -106,6 +109,7 @@ function playNotice(group: Extract<EventGroup, { kind: 'play' }>, ctx: TextConte
       : `Jugada de ${nm(actor)}: ${cardName(play.card)}`,
     title: `${who} ${mine ? 'jugaste' : 'jugó'} ${withArticle(play.card)}`,
     body: playText(play, effects, ctx),
+    effect: effectLine(play.card, mine),
     faces: [],
     secretFaces,
     visibility: 'public',
