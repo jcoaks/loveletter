@@ -1,7 +1,7 @@
 import { type CardValue, viewFor } from '@loveletter/engine';
 import { describe, expect, it } from 'vitest';
 import { rig, step } from '../test-utils';
-import { drawAnimations } from './draws';
+import { drawAnimations, TURN_DRAW_DELAY_MS } from './draws';
 
 const play = (s: ReturnType<typeof rig>, card: CardValue, targetId?: string, guess?: CardValue) =>
   step(s, { type: 'play_card', playerId: s.activeId as string, card, targetId, guess });
@@ -132,5 +132,24 @@ describe('drawAnimations: el Canciller devuelve al fondo', () => {
     const s = chancellor([7, 8, 1, 1], 2, [8, 7]);
     const last = viewFor(s, 'p0').events.at(-1)?.id ?? 0;
     expect(drawAnimations(fresh(s, 'p0', last), 'p0', [8, 7])).toEqual([]);
+  });
+});
+
+describe('drawAnimations: robo de inicio de turno', () => {
+  it('solo el robo de turno lleva la pausa (no el del Príncipe ni el del Canciller)', () => {
+    expect(TURN_DRAW_DELAY_MS).toBe(1000);
+    const turn = play(rig({ hands: [[4, 2], [3], [5]], deck: [7, 1, 1] }), 4);
+    expect(drawAnimations(fresh(turn, 'p2'), 'p2').map((a) => a.turnStart)).toEqual([true]);
+    const prince = play(rig({ hands: [[5, 2], [3], [4]], deck: [8, 1, 1, 1] }), 5, 'p1');
+    expect(drawAnimations(fresh(prince, 'p2'), 'p2').map((a) => !!a.turnStart)).toEqual([
+      false,
+      true,
+    ]);
+    const chan = play(rig({ hands: [[6, 2], [3], [4]], deck: [7, 8, 1, 1] }), 6);
+    expect(
+      drawAnimations(fresh(chan, 'p1'), 'p1')
+        .filter((a) => a.kind === 'draw')
+        .map((a) => !!a.turnStart),
+    ).toEqual([false, false]);
   });
 });

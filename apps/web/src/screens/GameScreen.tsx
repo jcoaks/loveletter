@@ -184,7 +184,9 @@ export function GameScreen() {
   // Una vista nueva libera el botón de jugar.
   const eventCount = game.events.length;
   const sending = submittedAt === eventCount;
-  const ready = canAct && !sending;
+  // Tu carta del turno todavía viaja del mazo a tu mano: hasta que aterriza no se puede jugar.
+  const takingCard = (draws.pending[game.you.id] ?? 0) > 0;
+  const ready = canAct && !sending && !takingCard;
 
   useWakeLock(wake && game.phase !== 'game_over');
   useTurnVibration(game.isMyTurn && game.phase === 'turn', haptics);
@@ -267,13 +269,15 @@ export function GameScreen() {
   const nameOf = ctx.name;
   const hint = !lp
     ? ''
-    : lp.blockedBy === 'countess'
-      ? `Con la Condesa en la mano no puedes jugar ${cardName(lp.card)}.`
-      : lp.card === 8 && hand.some((c) => c === 5 || c === 7)
-        ? 'Con Rey o Príncipe en la mano debes jugar la Condesa.'
-        : lp.targetRule !== 'none' && !lp.needsTarget
-          ? 'No hay a quién elegir: se descarta sin efecto.'
-          : CARD_BY_VALUE[lp.card].text;
+    : takingCard
+      ? 'Tomando carta…'
+      : lp.blockedBy === 'countess'
+        ? `Con la Condesa en la mano no puedes jugar ${cardName(lp.card)}.`
+        : lp.card === 8 && hand.some((c) => c === 5 || c === 7)
+          ? 'Con Rey o Príncipe en la mano debes jugar la Condesa.'
+          : lp.targetRule !== 'none' && !lp.needsTarget
+            ? 'No hay a quién elegir: se descarta sin efecto.'
+            : CARD_BY_VALUE[lp.card].text;
 
   const text = turnText(game, nameOf);
   const picker = lp ? pickerPlayers(game, seats, lp.targets) : [];

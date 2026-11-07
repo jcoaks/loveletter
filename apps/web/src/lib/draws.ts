@@ -3,6 +3,8 @@ import type { CardValue, GameEvent } from '@loveletter/engine';
 /** Una carta que viaja: del mazo a quien roba (`draw`) o de quien resuelve el Canciller al fondo del mazo (`return`). */
 export interface DrawAnim {
   kind: 'draw' | 'return';
+  /** Robo de inicio de turno (no el del Príncipe ni el del Canciller): espera `TURN_DRAW_DELAY_MS`. */
+  turnStart?: boolean;
   /** `ev-<id>` del suceso y posición dentro de él. */
   key: string;
   playerId: string;
@@ -13,6 +15,9 @@ export interface DrawAnim {
   /** Segundos de retraso respecto al comienzo de la tanda. */
   delay: number;
 }
+
+/** Pausa antes de que alguien tome la carta de su turno (solo visual; se cuenta desde que el vuelo puede salir). */
+export const TURN_DRAW_DELAY_MS = 1000;
 
 /** Separación entre robos de sucesos distintos, y entre las dos cartas del Canciller. */
 export const EVENT_GAP = 0.3;
@@ -39,6 +44,7 @@ export function drawAnimations(
       out.push([
         {
           kind: 'draw' as const,
+          ...(e.reason === 'turn' ? { turnStart: true } : {}),
           key: `ev-${e.id}-0`,
           playerId: e.playerId,
           mine,

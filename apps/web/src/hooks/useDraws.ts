@@ -2,7 +2,7 @@ import type { CardValue, PlayerView } from '@loveletter/engine';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Flight, Rect } from '../components/DrawLayer';
 import { FLIGHT_SECONDS } from '../components/DrawLayer';
-import { type DrawAnim, drawAnimations } from '../lib/draws';
+import { type DrawAnim, drawAnimations, TURN_DRAW_DELAY_MS } from '../lib/draws';
 
 const toRect = (el: Element | undefined | null): Rect | null => {
   if (!el) return null;
@@ -87,8 +87,15 @@ export function useDraws(
     const fresh = game.events.filter((e) => e.id > base);
     if (fresh.length === 0) return;
     seen.current = lastId;
-    if (reducedMotion()) return;
     const anims = drawAnimations(fresh, game.you.id, getBottom?.());
+    if (reducedMotion()) {
+      // Sin vuelo, pero la carta del turno aparece tras la misma pausa.
+      for (const a of anims.filter((x) => x.kind === 'draw' && x.turnStart)) {
+        setPending((p) => ({ ...p, [a.playerId]: (p[a.playerId] ?? 0) + 1 }));
+        window.setTimeout(() => settle(a.playerId), TURN_DRAW_DELAY_MS);
+      }
+      return;
+    }
     if (anims.length === 0) return;
     waiting.current.push(...anims);
     setPending((p) => {
@@ -176,7 +183,7 @@ export function useDraws(
           card: a.card,
           from: deck,
           to,
-          delay: wait + a.delay,
+          delay: wait + a.delay + (a.turnStart ? TURN_DRAW_DELAY_MS / 1000 : 0),
         });
       }
       if (added.length === 0) return;
