@@ -1464,6 +1464,25 @@ body {
     pointer-events: none;
     overflow: hidden;
   }
+  /* Capa recortada por la pila del mazo: lo que cae dentro queda tapado (entra por debajo). */
+  .ll-flight-clip {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+  }
+  .ll-stack.nudge {
+    animation: ll-settle 0.15s ease-out;
+  }
+  @keyframes ll-settle {
+    40% {
+      transform: translate(2px, 3px);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ll-stack.nudge {
+      animation: none;
+    }
+  }
   .ll-flyer {
     position: fixed;
     left: 0;

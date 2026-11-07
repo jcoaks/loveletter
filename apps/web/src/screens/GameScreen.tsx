@@ -429,6 +429,7 @@ export function GameScreen() {
           rivals={seats.rivals}
           toWin={toWin}
           deckCount={Math.max(0, game.deckSize - draws.deckHold)}
+          deckNudge={draws.deckNudge}
           setAside={{ hidden: game.hasSetAside ? 1 : 0, faceUp: game.faceUp }}
           turn={
             <TurnBanner

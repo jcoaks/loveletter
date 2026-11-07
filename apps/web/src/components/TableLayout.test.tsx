@@ -28,6 +28,34 @@ const table = (n: number, deckCount = 9) =>
     />,
   );
 
+describe('Mazo: asentamiento al meterse una carta al fondo', () => {
+  it('la pila lleva la clase de asentamiento solo tras recibir una carta', () => {
+    const { container, rerender } = render(
+      <TableLayout
+        rivals={[]}
+        toWin={3}
+        deckCount={5}
+        setAside={{ hidden: 1, faceUp: [] }}
+        turn={<span>t</span>}
+        mine={<span>m</span>}
+      />,
+    );
+    expect(container.querySelector('.ll-stack')).not.toHaveClass('nudge');
+    rerender(
+      <TableLayout
+        rivals={[]}
+        toWin={3}
+        deckCount={6}
+        deckNudge={1}
+        setAside={{ hidden: 1, faceUp: [] }}
+        turn={<span>t</span>}
+        mine={<span>m</span>}
+      />,
+    );
+    expect(container.querySelector('.ll-stack')).toHaveClass('nudge');
+  });
+});
+
 describe('TableLayout', () => {
   it.each([1, 2, 4, 5])('%i rivales en una sola fila compacta', (n) => {
     const { container } = table(n);

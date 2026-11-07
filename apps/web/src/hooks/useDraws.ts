@@ -39,6 +39,8 @@ export function useDraws(
   const [pending, setPending] = useState<Record<string, number>>({});
   /** Cartas devueltas al fondo que aún vuelan: el contador del mazo no las cuenta hasta que llegan. */
   const [deckHold, setDeckHold] = useState(0);
+  /** Cuenta las cartas que ya se metieron al fondo: la pila se asienta con cada una. */
+  const [deckNudge, setDeckNudge] = useState(0);
 
   const settle = useCallback((playerId: string) => {
     setPending((p) => {
@@ -60,8 +62,10 @@ export function useDraws(
       // Solo se descuenta una vez por vuelo (puede aterrizar por la animación o por el temporizador).
       if (landed.current.has(f.id)) return;
       landed.current.add(f.id);
-      if (f.kind === 'return') setDeckHold((n) => Math.max(0, n - 1));
-      else settle(f.playerId);
+      if (f.kind === 'return') {
+        setDeckHold((n) => Math.max(0, n - 1));
+        setDeckNudge((n) => n + 1);
+      } else settle(f.playerId);
     },
     [settle],
   );
@@ -190,6 +194,7 @@ export function useDraws(
     flights,
     pending,
     deckHold,
+    deckNudge,
     land,
     active: Object.keys(pending).length > 0 || deckHold > 0,
   };

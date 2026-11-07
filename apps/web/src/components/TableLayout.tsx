@@ -8,11 +8,13 @@ import { LogPanel } from './LogPanel';
 import { SeatCard, type SeatMark } from './SeatCard';
 
 /** Mazo: tantas cartas apiladas como queden (hasta 3); vacío, un hueco con el 0. Caja de tamaño fijo. */
-export function DeckStack({ count }: { count: number }) {
+export function DeckStack({ count, nudge = 0 }: { count: number; nudge?: number }) {
   const layers = Math.min(3, Math.max(0, count));
   return (
     <div
-      className={`ll-stack${layers === 0 ? ' empty' : ''}`}
+      // Cada carta que se mete al fondo repite el pequeño asentamiento (la clave reinicia la animación).
+      key={nudge}
+      className={`ll-stack${layers === 0 ? ' empty' : ''}${nudge > 0 ? ' nudge' : ''}`}
       role="img"
       aria-label={`Mazo: ${count} ${count === 1 ? 'carta' : 'cartas'}`}
     >
@@ -41,6 +43,7 @@ export function TableLayout({
   rivals,
   toWin,
   deckCount,
+  deckNudge = 0,
   setAside,
   turn,
   mine,
@@ -55,6 +58,8 @@ export function TableLayout({
   rivals: readonly SeatData[];
   toWin: number;
   deckCount: number;
+  /** Sube cada vez que una carta se mete al fondo del mazo: la pila se asienta un instante. */
+  deckNudge?: number;
   /** Cartas apartadas: `hidden` boca abajo y `faceUp` visibles (partidas de 2). */
   setAside: { hidden: number; faceUp: readonly CardValue[] };
   /** Bloque central de turno (normalmente un `TurnBanner`). */
@@ -92,7 +97,7 @@ export function TableLayout({
             <div className="ll-center">
               <div className="ll-pile">
                 <div className="ll-slot">
-                  <DeckStack count={deckCount} />
+                  <DeckStack count={deckCount} nudge={deckNudge} />
                 </div>
                 <span className="ll-lbl">Mazo</span>
               </div>

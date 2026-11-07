@@ -107,3 +107,34 @@ describe('DrawLayer: regreso al fondo del mazo', () => {
     expect(document.querySelectorAll('.ll-flights .ll-flyer')).toHaveLength(2);
   });
 });
+
+describe('DrawLayer: por debajo de la pila (devoluciones) y por encima (robos)', () => {
+  it('las devueltas van en una capa recortada por la pila del mazo: quedan tapadas por ella', () => {
+    render(
+      <DrawLayer
+        flights={[
+          flight({
+            kind: 'return',
+            id: 'r',
+            from: rect(100, 120, 38, 53),
+            to: rect(600, 200, 44, 59),
+          }),
+        ]}
+        onLand={() => undefined}
+      />,
+    );
+    const clip = document.querySelector('.ll-flight-clip') as HTMLElement;
+    expect(clip).not.toBeNull();
+    // Polígono par-impar: pantalla entera menos el rectángulo de la pila (600,200)-(644,259).
+    expect(clip.style.clipPath).toContain('evenodd');
+    expect(clip.style.clipPath).toContain('600px 200px');
+    expect(clip.style.clipPath).toContain('644px 259px');
+    expect(clip.querySelector('.ll-flyer')).not.toBeNull();
+  });
+
+  it('los robos no se recortan: salen por encima de la pila', () => {
+    render(<DrawLayer flights={[flight()]} onLand={() => undefined} />);
+    expect(document.querySelector('.ll-flight-clip')).toBeNull();
+    expect(document.querySelector('.ll-flights > .ll-flyer')).not.toBeNull();
+  });
+});

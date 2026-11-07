@@ -29,6 +29,12 @@ export interface Flight {
 }
 
 export const FLIGHT_SECONDS = 0.6;
+/** Cuánto asoma (px) por debajo de la pila, hacia abajo y a la derecha, la carta que se mete al fondo. */
+const UNDER_OFFSET = 10;
+
+/** Recorta todo menos el rectángulo de la pila: la carta queda tapada por ella, como si entrara por debajo. */
+const underStack = (r: Rect): string =>
+  `polygon(evenodd, 0px 0px, 100vw 0px, 100vw 100vh, 0px 100vh, 0px 0px, ${r.left}px ${r.top}px, ${r.left}px ${r.top + r.height}px, ${r.left + r.width}px ${r.top + r.height}px, ${r.left + r.width}px ${r.top}px, ${r.left}px ${r.top}px)`;
 const BACK = 'url(/assets/card-back.webp) center / 100% 100% no-repeat, #5a1d38';
 
 /** Vuelo de regreso al mazo: la carta (cara si es tuya) encoge, gira a reverso y se cuela bajo la pila. */
@@ -42,7 +48,8 @@ function ReturnView({ flight, onLand }: { flight: Flight; onLand: (f: Flight) =>
     transformOrigin: '0 0',
     transformPerspective: 900,
   } as CSSProperties;
-  const end = Math.max(0.2, to.width / from.width);
+  // Termina en la esquina inferior derecha de la pila, asomando un poco, y queda tapada por ella.
+  const end = Math.max(0.2, (to.width - 6) / from.width);
   const arc = (ease: [number, number, number, number]) => ({ duration: d, delay, ease });
   return (
     <motion.div
@@ -50,10 +57,12 @@ function ReturnView({ flight, onLand }: { flight: Flight; onLand: (f: Flight) =>
       style={style}
       initial={{ x: from.left, y: from.top, scale: 1, rotate: 5, opacity: 0 }}
       animate={{
-        x: to.left + 5,
-        y: to.top + 5,
+        x: to.left + UNDER_OFFSET,
+        y: to.top + UNDER_OFFSET,
         scale: end,
         rotate: -4,
+        // Sin fundido sobre la pila: lo que se ve de la carta es lo que la pila no tapa; solo la
+        // rendija que asoma se apaga en el último instante, al sustituirla la pila real.
         opacity: [1, 1, 0],
       }}
       transition={{
@@ -61,8 +70,7 @@ function ReturnView({ flight, onLand }: { flight: Flight; onLand: (f: Flight) =>
         y: arc([0.22, 1, 0.36, 1]),
         scale: arc([0.45, 0, 0.2, 1]),
         rotate: arc([0.22, 1, 0.36, 1]),
-        // Se cuela bajo la pila: se desvanece justo al llegar.
-        opacity: { duration: d, delay, times: [0, 0.8, 1], ease: 'linear' },
+        opacity: { duration: d, delay, times: [0, 0.94, 1], ease: 'linear' },
       }}
       onAnimationComplete={() => onLand(flight)}
     >
@@ -146,7 +154,10 @@ export function DrawLayer({
     <div className="ll-flights" aria-hidden="true">
       {flights.map((f) =>
         f.kind === 'return' ? (
-          <ReturnView key={f.id} flight={f} onLand={onLand} />
+          // Las devueltas entran por debajo de la pila (la pila las tapa); los robos salen por encima.
+          <div key={f.id} className="ll-flight-clip" style={{ clipPath: underStack(f.to) }}>
+            <ReturnView flight={f} onLand={onLand} />
+          </div>
         ) : (
           <FlightView key={f.id} flight={f} onLand={onLand} />
         ),
