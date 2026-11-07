@@ -327,6 +327,22 @@ describe('Sala de espera', () => {
     expect(screen.queryByText('Zoe se sentó a la mesa')).toBeNull();
   });
 
+  it('no repite las reglas en la sala: solo el botón "Reglas" de arriba, que las abre', async () => {
+    const { user } = setup(true);
+    expect(screen.queryByRole('heading', { name: 'Cómo se juega' })).toBeNull();
+    expect(screen.queryByText(/Leer las reglas completas/)).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Reglas' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('la invitación no se sale del sobre: sello, rótulo, código y botones', () => {
+    setup(true);
+    const invite = screen.getByRole('region', { name: 'Invitación a la sala' });
+    expect(within(invite).getByText('KX7-QM2')).toBeInTheDocument();
+    expect(within(invite).getByText(/Invitación · código de sala/)).toBeInTheDocument();
+    expect(within(invite).getAllByRole('button')).toHaveLength(2);
+  });
+
   it('inicia cuando la sala lo permite', async () => {
     const { send, user } = setup(true, { canStart: true });
     await user.click(screen.getByRole('button', { name: 'Comenzar la partida' }));

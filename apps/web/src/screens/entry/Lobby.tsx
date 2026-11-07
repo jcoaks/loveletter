@@ -200,21 +200,6 @@ export function LobbyScreen() {
               : 'Hacen falta al menos 2 jugadores para empezar.'}
           </p>
         )}
-
-        <section className="lb-how" aria-labelledby="h-how">
-          <h2 id="h-how" className="lb-h">
-            Cómo se juega
-          </h2>
-          <ol className="lb-how-list">
-            <li>En tu turno robas una carta y juegas una de las dos que tienes.</li>
-            <li>Cada carta tiene un efecto: adivinar, espiar, comparar, proteger…</li>
-            <li>Gana la ronda quien queda en pie o tiene la carta más alta.</li>
-          </ol>
-          <button type="button" className="lb-link" onClick={() => openDialog('rules')}>
-            Leer las reglas completas
-          </button>
-        </section>
-
         <div className="lb-cta ll-lobby-cta">
           {you && !you.bot && (
             <button
@@ -297,7 +282,7 @@ function InviteCard({ code }: { code: string }) {
         )}
         <button
           type="button"
-          className={canShare ? 'll-ghost' : 'll-play lb-share'}
+          className={canShare ? 'll-ghost' : 'll-play'}
           onClick={() => copy('link')}
         >
           {copied === 'link' ? 'Enlace copiado' : 'Copiar enlace'}
