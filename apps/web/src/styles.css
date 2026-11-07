@@ -2134,14 +2134,16 @@ body {
       border-radius: 20px 20px 0 0;
       animation: ll-rise 0.22s ease-out;
     }
+    /* Colchón al final del scroll: la barra flotante de Safari / del navegador integrado tapa
+       el borde inferior y no siempre cuenta en safe-area, así el último contenido sube por encima. */
     .ll-sheet::after {
       content: "";
-      height: max(4px, env(safe-area-inset-bottom, 0px));
+      height: calc(max(4px, env(safe-area-inset-bottom, 0px)) + 56px);
     }
     /* El pie de acciones se queda a la vista aunque la hoja tenga scroll. */
     .ll-sheet > .ll-row2 {
       position: sticky;
-      bottom: 0;
+      bottom: calc(max(4px, env(safe-area-inset-bottom, 0px)) + 56px);
       z-index: 1;
       margin: 0 -16px;
       padding: 12px 16px 8px;
@@ -2312,7 +2314,7 @@ body {
       padding-top: 6px;
     }
     .ll-sheet {
-      max-height: 94dvh;
+      max-height: 90dvh;
     }
   }
 
