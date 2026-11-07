@@ -7,7 +7,7 @@ import './styles.css';
 import { MotionConfig } from 'motion/react';
 import { lazy, StrictMode, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
-import { createBrowserRouter, RouterProvider } from 'react-router';
+import { createBrowserRouter, RouterProvider, useRouteError } from 'react-router';
 import { Placeholder } from './screens/Placeholder';
 
 const lazyDefault = <T extends { default: React.ComponentType }>(load: () => Promise<T>) =>
@@ -21,10 +21,47 @@ const Gallery = import.meta.env.DEV
   ? lazy(() => import('./screens/dev/Gallery').then((m) => ({ default: m.Gallery })))
   : null;
 
+// Tras un despliegue, una pestaña abierta pide fragmentos con hash que ya no existen: se recarga
+// una sola vez para traer la versión nueva (la marca evita un bucle si el fallo es otro).
+const RELOAD_KEY = 'll-chunk-reload';
+const reloadForNewVersion = () => {
+  try {
+    const last = Number(sessionStorage.getItem(RELOAD_KEY) ?? 0);
+    if (Date.now() - last < 10_000) return false;
+    sessionStorage.setItem(RELOAD_KEY, String(Date.now()));
+  } catch {
+    return false;
+  }
+  window.location.reload();
+  return true;
+};
+window.addEventListener('vite:preloadError', (event) => {
+  if (reloadForNewVersion()) event.preventDefault();
+});
+
+const isChunkError = (error: unknown) =>
+  error instanceof Error &&
+  /dynamically imported module|Importing a module script failed/i.test(error.message);
+
+function RouteError() {
+  const error = useRouteError();
+  if (isChunkError(error) && reloadForNewVersion()) return <div className="min-h-dvh" />;
+  return (
+    <div className="grid min-h-dvh place-items-center p-6 text-center">
+      <div>
+        <p className="mb-4">Algo salió mal al cargar la página.</p>
+        <button type="button" className="ll-play" onClick={() => window.location.reload()}>
+          Recargar
+        </button>
+      </div>
+    </div>
+  );
+}
+
 const router = createBrowserRouter([
-  { path: '/', element: <Home /> },
-  { path: '/sala/:code', element: <RoomPage /> },
-  { path: '/reglas', element: <Rules /> },
+  { path: '/', element: <Home />, errorElement: <RouteError /> },
+  { path: '/sala/:code', element: <RoomPage />, errorElement: <RouteError /> },
+  { path: '/reglas', element: <Rules />, errorElement: <RouteError /> },
   ...(Gallery ? [{ path: '/dev/gallery', element: <Gallery /> }] : []),
   { path: '*', element: <Placeholder /> },
 ]);
