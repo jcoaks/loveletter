@@ -14,6 +14,10 @@
   --color-wax: #c23049;
   --color-rose: #d98a98;
 
+  /* Botones: un solo alto, radio y espaciado para todo el juego. */
+  --btn-h: 48px;
+  --btn-r: 10px;
+
   --card-w-lg: clamp(132px, 17vw, 166px);
   --card-w-sm: 38px;
 
@@ -362,50 +366,138 @@ body {
     opacity: 1;
   }
 
-  /* ---------- Botones ---------- */
-  .ll-play {
+  /* ---------- Botones: sistema único ----------
+     Primario  .ll-play    cera roja, Cinzel: la acción principal de cada pantalla.
+     Secundario .ll-ghost  contorno dorado sobre vino translúcido: el resto de acciones.
+     Peligro   .ll-danger  como el secundario, con contorno rojo: salir, abandonar.
+     Icono     .ll-x       redondo, secundario: cerrar, quitar, subir/bajar.
+     Enlace    .ll-link    solo dentro de un párrafo o pie.
+     .ll-light en un contenedor de pergamino da la variante para fondo claro;
+     .ll-glass le añade fondo vino con desenfoque para leerse sobre el arte. */
+  .ll-play,
+  .ll-ghost,
+  .ll-danger,
+  .ll-x {
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--btn-h);
+    margin: 0;
+    padding: 8px 18px;
+    border: 1px solid transparent;
+    border-radius: var(--btn-r);
     font: inherit;
-    font-weight: 700;
-    min-height: 44px;
-    border: 0;
-    border-radius: 10px;
-    padding: 12px 22px;
+    font-size: 16px;
+    line-height: 1.2;
+    text-align: center;
+    text-decoration: none;
     cursor: pointer;
+    transition:
+      background-color 0.15s,
+      border-color 0.15s,
+      filter 0.15s,
+      transform 0.1s;
+  }
+  .ll-play {
     background: var(--color-wax);
-    color: #fff;
+    color: var(--color-ivory);
     font-family: var(--font-display);
+    font-weight: 700;
     letter-spacing: 0.06em;
   }
-  .ll-play:disabled {
+  .ll-ghost,
+  .ll-danger,
+  .ll-x {
+    background: rgb(43 14 27 / 0.45);
+    border-color: rgb(201 164 92 / 0.7);
+    color: var(--color-gold-light);
+    font-weight: 500;
+  }
+  .ll-danger {
+    border-color: rgb(194 48 73 / 0.9);
+    color: #ffc2cc;
+  }
+  .ll-x {
+    flex: none;
+    width: var(--btn-h);
+    padding: 0;
+    border-radius: 50%;
+    font-size: 26px;
+    line-height: 1;
+  }
+  @media (hover: hover) {
+    .ll-play:hover:not(:disabled) {
+      filter: brightness(1.12);
+    }
+    .ll-ghost:hover:not(:disabled),
+    .ll-x:hover:not(:disabled) {
+      background: rgb(201 164 92 / 0.2);
+      border-color: var(--color-gold);
+    }
+    .ll-danger:hover:not(:disabled) {
+      background: rgb(194 48 73 / 0.22);
+      border-color: var(--color-wax);
+    }
+  }
+  .ll-play:active:not(:disabled),
+  .ll-ghost:active:not(:disabled),
+  .ll-danger:active:not(:disabled),
+  .ll-x:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+  .ll-play:active:not(:disabled) {
+    filter: brightness(0.9);
+  }
+  .ll-ghost:active:not(:disabled),
+  .ll-x:active:not(:disabled) {
+    background: rgb(201 164 92 / 0.3);
+  }
+  .ll-play:disabled,
+  .ll-ghost:disabled,
+  .ll-danger:disabled,
+  .ll-x:disabled {
     opacity: 0.45;
     cursor: not-allowed;
   }
-  .ll-ghost {
-    font: inherit;
-    min-height: 44px;
-    background: none;
-    border: 1px solid rgb(201 164 92 / 0.6);
-    color: var(--color-gold);
-    border-radius: 8px;
-    padding: 6px 14px;
-    cursor: pointer;
+  /* Sobre el arte de la portada: vino casi opaco con desenfoque suave. */
+  .ll-glass {
+    background: rgb(43 14 27 / 0.82);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
   }
-  .ll-ghost:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
+  /* Superficies claras (pergamino): misma forma y tipografía, tinta oscura. */
+  .ll-light .ll-ghost,
+  .ll-light .ll-x {
+    background: rgb(255 255 255 / 0.35);
+    border-color: rgb(26 10 16 / 0.7);
+    color: #1a0a10;
+    font-weight: 700;
   }
-  .ll-x {
-    font: inherit;
-    font-size: 26px;
-    line-height: 1;
-    flex: none;
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    border: 1px solid var(--color-gold);
-    background: none;
-    color: var(--color-gold);
-    cursor: pointer;
+  .ll-light .ll-danger {
+    background: rgb(255 255 255 / 0.35);
+    border-color: #8c1630;
+    color: #8c1630;
+    font-weight: 700;
+  }
+  @media (hover: hover) {
+    .ll-light .ll-ghost:hover:not(:disabled),
+    .ll-light .ll-x:hover:not(:disabled),
+    .ll-light .ll-danger:hover:not(:disabled) {
+      background: rgb(255 255 255 / 0.7);
+      border-color: #1a0a10;
+    }
+  }
+  .ll-light :focus-visible {
+    outline-color: #1a0a10;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ll-play,
+    .ll-ghost,
+    .ll-danger,
+    .ll-x {
+      transition: none;
+    }
   }
 
   /* ---------- Asientos ---------- */
@@ -607,16 +699,10 @@ body {
   }
   .ll-bar .ll-ghost {
     position: relative;
-    padding: 4px 12px;
   }
   .ll-bar .ll-tool .ll-ic,
   .ll-bar .ll-more {
     display: none;
-  }
-  .ll-bar .ll-switch {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
   }
   .ll-badge {
     display: inline-block;
@@ -1604,8 +1690,8 @@ body {
     gap: 12px;
     min-height: 56px;
     padding: 8px 14px;
-    border-radius: 12px;
-    border: 1px solid rgb(201 164 92 / 0.4);
+    border-radius: var(--btn-r);
+    border: 1px solid rgb(201 164 92 / 0.7);
     background: rgb(0 0 0 / 0.28);
     cursor: pointer;
   }
@@ -1718,7 +1804,7 @@ body {
       flex-wrap: nowrap;
       gap: 0;
     }
-    .ll-bar .ll-desk.ll-ghost {
+    .ll-bar .ll-desk {
       display: none;
     }
     .ll-bar .ll-tool,
@@ -1989,9 +2075,6 @@ body {
     .ll-act .ll-play {
       order: 2;
       flex: 1 1 100%;
-      min-height: 52px;
-      padding: 8px 14px;
-      font-size: 17px;
     }
     .ll-act .hint {
       order: 1;
@@ -2116,7 +2199,6 @@ body {
     .ll-row2 > .ll-play,
     .ll-row2 > .ll-ghost {
       flex: 1 1 40%;
-      min-height: 52px;
     }
     .ll-notice-row {
       flex-wrap: nowrap;
@@ -2144,9 +2226,6 @@ body {
     .ll-bar .ll-tool,
     .ll-bar .ll-more {
       min-height: 44px;
-    }
-    .ll-act .ll-play {
-      min-height: 48px;
     }
     .ll-actbar {
       padding-top: 6px;
@@ -2232,9 +2311,6 @@ body {
     .ll-actbar {
       padding-top: 6px;
     }
-    .ll-act .ll-play {
-      min-height: 48px;
-    }
     .ll-sheet {
       max-height: 94dvh;
     }
@@ -2315,33 +2391,6 @@ body {
     min-height: 44px;
     align-items: center;
     font-size: 16px;
-  }
-  /* Pergamino con tinta casi negra: se lee igual sobre cualquier parte del arte. */
-  .lh-nav a,
-  .lh-nav a:visited {
-    display: inline-flex;
-    align-items: center;
-    min-height: 44px;
-    padding: 0 16px;
-    border: 1px solid #8c6a2e;
-    border-radius: 99px;
-    background: rgb(246 230 184 / 0.96);
-    color: #1a0a10;
-    font-size: 16px;
-    font-weight: 700;
-    text-decoration: underline;
-    text-decoration-thickness: 1.5px;
-    text-underline-offset: 3px;
-    box-shadow: 0 2px 10px rgb(0 0 0 / 0.35);
-  }
-  .lh-nav a:hover {
-    background: #fff3cf;
-    color: #000;
-  }
-  .lh-nav a:focus-visible,
-  .lh-card :focus-visible {
-    outline: 3px solid #1a0a10;
-    outline-offset: 3px;
   }
   .lh-hero-in {
     width: min(100%, 460px);
@@ -2445,15 +2494,6 @@ body {
     letter-spacing: 0.16em;
     text-transform: uppercase;
     font-weight: 700;
-  }
-  .lh-card .ll-ghost {
-    color: var(--color-ink);
-    border-color: rgb(74 17 38 / 0.6);
-    font-weight: 700;
-  }
-  .lh-card .ll-play {
-    min-height: 52px;
-    font-size: 18px;
   }
   .lh-card .ll-err {
     color: #8c1630;
@@ -2969,16 +3009,10 @@ body {
   .lb-invite-btns .ll-ghost {
     flex: 1 1 130px;
     min-width: 0;
-    min-height: 52px;
     padding-inline: 12px;
   }
   .lb-invite-btns .lb-share {
     flex-basis: 100%;
-  }
-  .lb-invite .ll-ghost {
-    color: var(--color-ink);
-    border-color: rgb(74 17 38 / 0.65);
-    font-weight: 700;
   }
   .lb-invite .ll-err {
     color: #8c1630;
@@ -3152,20 +3186,9 @@ body {
     gap: 6px;
   }
   .lb-step {
-    font: inherit;
     width: 52px;
     height: 52px;
-    border: 1px solid var(--color-gold);
-    border-radius: 50%;
-    background: rgb(0 0 0 / 0.3);
-    color: var(--color-gold-light);
     font-size: 28px;
-    line-height: 1;
-    cursor: pointer;
-  }
-  .lb-step:disabled {
-    opacity: 0.35;
-    cursor: not-allowed;
   }
   .lb-step-n {
     min-width: 34px;
@@ -3184,10 +3207,6 @@ body {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
     align-items: start;
     gap: 8px 10px;
-  }
-  .lb-cta .ll-play,
-  .lb-cta .ll-ghost {
-    min-height: 52px;
   }
   .lb-start {
     display: contents;

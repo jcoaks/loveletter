@@ -43,7 +43,10 @@ export function JoinLinkScreen({ code: rawCode }: { code: string }) {
     return (
       <EntryShell hero>
         <Logo width={260} />
-        <section className="lh-card grid w-full max-w-[540px] gap-4" aria-labelledby="h-join">
+        <section
+          className="lh-card ll-light grid w-full max-w-[540px] gap-4"
+          aria-labelledby="h-join"
+        >
           <h1 id="h-join" className="m-0 font-display text-2xl tracking-wider">
             Unirse con un código
           </h1>
@@ -92,7 +95,7 @@ export function JoinLinkScreen({ code: rawCode }: { code: string }) {
         onSubmit={onSubmit}
         noValidate
         aria-labelledby="h-invite"
-        className="lh-card grid w-full max-w-[520px] gap-4"
+        className="lh-card ll-light grid w-full max-w-[520px] gap-4"
       >
         <h1 id="h-invite" className="m-0 font-display text-2xl tracking-wider">
           {info?.hostName ? `${info.hostName} te invita a su mesa` : 'Te invitan a una mesa'}

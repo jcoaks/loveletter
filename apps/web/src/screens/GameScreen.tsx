@@ -409,7 +409,7 @@ export function GameScreen() {
           </div>
           <button
             type="button"
-            className="ll-ghost ll-exit ll-desk"
+            className="ll-danger ll-exit ll-desk"
             onClick={() => openDialog('leave')}
           >
             Salir

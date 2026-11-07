@@ -9,7 +9,7 @@ export default function RulesScreen() {
       <header className="grid gap-4">
         <div className="flex items-center justify-between gap-3">
           <LogoLockup height={36} />
-          <Link to="/" className="ll-ghost inline-grid place-items-center no-underline">
+          <Link to="/" className="ll-ghost">
             Volver al inicio
           </Link>
         </div>

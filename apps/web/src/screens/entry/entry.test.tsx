@@ -126,6 +126,19 @@ describe('Portada', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('los botones y enlaces-botón usan el sistema de estilos del juego', () => {
+    renderHome();
+    expect(screen.getByRole('button', { name: 'Crear sala' })).toHaveClass('ll-play');
+    expect(screen.getByRole('button', { name: 'Entrar a la sala' })).toHaveClass('ll-ghost');
+    for (const name of ['Cómo se juega', 'Reglas']) {
+      const link = screen.getByRole('link', { name });
+      expect(link).toHaveClass('ll-ghost', 'll-glass');
+      expect(link.className).not.toMatch(/lh-nav|underline/);
+    }
+    // El pergamino usa la variante para fondo claro, no un estilo aparte.
+    expect(screen.getByRole('button', { name: 'Crear sala' }).closest('.ll-light')).not.toBeNull();
+  });
+
   it('el logo es el título y la página no tiene dos campos de nombre', () => {
     renderHome();
     expect(
@@ -341,6 +354,20 @@ describe('Sala de espera', () => {
     expect(within(invite).getByText('KX7-QM2')).toBeInTheDocument();
     expect(within(invite).getByText(/Invitación · código de sala/)).toBeInTheDocument();
     expect(within(invite).getAllByRole('button')).toHaveLength(2);
+  });
+
+  it('la barra y la invitación usan las variantes del sistema', () => {
+    setup(true);
+    expect(screen.getByRole('button', { name: 'Reglas' })).toHaveClass('ll-ghost');
+    expect(screen.getByRole('button', { name: 'Salir' })).toHaveClass('ll-danger');
+    expect(screen.getByRole('button', { name: 'Copiar enlace' })).toHaveClass('ll-play');
+    expect(screen.getByRole('button', { name: 'Copiar código' })).toHaveClass('ll-ghost');
+    expect(
+      screen.getByRole('button', { name: 'Copiar código' }).closest('.ll-light'),
+    ).not.toBeNull();
+    for (const b of screen.getAllByRole('button')) {
+      expect(b.className).toMatch(/\bll-(play|ghost|danger|x)\b/);
+    }
   });
 
   it('inicia cuando la sala lo permite', async () => {

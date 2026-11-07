@@ -49,6 +49,14 @@ const PAIRS: ReadonlyArray<[string, ReturnType<typeof hex>, ReturnType<typeof he
   ['enlace a las reglas', GOLD_LIGHT, over(BLACK, 0.3, WINE)],
   ['aviso de reconexión', hex('#ffd7de'), over(WAX, 0.18, WINE2)],
   ['"Jugar" sobre cera', WHITE, WAX],
+  // Sistema de botones (styles.css): cada variante, sobre su peor fondo
+  ['primario: marfil sobre cera', IVORY, WAX],
+  ['secundario sobre vino', GOLD_LIGHT, over(WINE, 0.45, WINE2)],
+  ['secundario sobre el fondo más claro de la mesa', GOLD_LIGHT, over(WINE, 0.45, hex('#5a1d38'))],
+  ['peligro sobre vino', hex('#ffc2cc'), over(WINE, 0.45, WINE2)],
+  ['secundario con vidrio sobre el arte más claro', GOLD_LIGHT, over(WINE, 0.82, PARCH_LIGHT)],
+  ['secundario sobre pergamino', BLACKISH, over(WHITE, 0.35, PARCH_DARK)],
+  ['peligro sobre pergamino', hex('#8c1630'), over(WHITE, 0.35, PARCH_DARK)],
 ];
 
 describe('Contraste de texto (WCAG AA, ≥ 4.5:1)', () => {

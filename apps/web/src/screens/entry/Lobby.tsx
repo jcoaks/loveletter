@@ -85,7 +85,7 @@ export function LobbyScreen() {
           <button type="button" className="ll-ghost" onClick={() => openDialog('rules')}>
             Reglas
           </button>
-          <button type="button" className="ll-ghost" onClick={() => openDialog('leave')}>
+          <button type="button" className="ll-danger" onClick={() => openDialog('leave')}>
             Salir
           </button>
         </div>
@@ -158,7 +158,7 @@ export function LobbyScreen() {
               <div className="lb-stepper-ctl" role="group" aria-labelledby="bots-lbl">
                 <button
                   type="button"
-                  className="lb-step"
+                  className="ll-x lb-step"
                   aria-label="Quitar un bot"
                   disabled={!canAct || room.config.bots <= 0}
                   onClick={() =>
@@ -172,7 +172,7 @@ export function LobbyScreen() {
                 </output>
                 <button
                   type="button"
-                  className="lb-step"
+                  className="ll-x lb-step"
                   aria-label="Añadir un bot"
                   disabled={!canAct || count >= maxPlayers}
                   onClick={() =>
@@ -263,7 +263,7 @@ function InviteCard({ code }: { code: string }) {
     }
   }
   return (
-    <section className="lb-invite" aria-label="Invitación a la sala">
+    <section className="lb-invite ll-light" aria-label="Invitación a la sala">
       <img
         className="lb-invite-seal"
         src="/assets/seal.webp"

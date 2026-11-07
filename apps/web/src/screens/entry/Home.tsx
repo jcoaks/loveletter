@@ -114,10 +114,10 @@ export function HomeScreen() {
         </picture>
         <div className="lh-shade" aria-hidden="true" />
         <nav aria-label="Ayuda" className="lh-nav">
-          <a href="#como" className="ll-link">
+          <a href="#como" className="ll-ghost ll-glass">
             Cómo se juega
           </a>
-          <Link to="/reglas" className="ll-link">
+          <Link to="/reglas" className="ll-ghost ll-glass">
             Reglas
           </Link>
         </nav>
@@ -134,7 +134,7 @@ export function HomeScreen() {
             </p>
           </div>
 
-          <div className="lh-card">
+          <div className="lh-card ll-light">
             <img
               className="ll-seal stamp lh-stamp"
               src="/assets/seal.webp"

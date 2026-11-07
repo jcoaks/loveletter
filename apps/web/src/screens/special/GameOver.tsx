@@ -47,7 +47,7 @@ export function GameOverModal({
           <button type="button" className="ll-ghost" onClick={onHide}>
             Ver la mesa
           </button>
-          <button type="button" className="ll-ghost" onClick={() => openDialog('leave')}>
+          <button type="button" className="ll-danger" onClick={() => openDialog('leave')}>
             Salir de la sala
           </button>
           {room.you.isHost ? (

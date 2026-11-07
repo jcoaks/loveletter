@@ -14,7 +14,7 @@ export function Placeholder() {
         />
         <p className="m-0 text-lg text-ivory/80">Hazle llegar tu carta a la Princesa.</p>
         {import.meta.env.DEV && (
-          <a className="ll-ghost inline-grid place-items-center no-underline" href="/dev/gallery">
+          <a className="ll-ghost" href="/dev/gallery">
             Galería de componentes
           </a>
         )}
