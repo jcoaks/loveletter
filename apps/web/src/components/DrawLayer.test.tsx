@@ -65,3 +65,45 @@ describe('HandRow con cartas en vuelo', () => {
     expect(screen.getAllByRole('img').length).toBe(2);
   });
 });
+
+describe('DrawLayer: regreso al fondo del mazo', () => {
+  const back = (over: Partial<Flight> = {}): Flight =>
+    flight({
+      kind: 'return',
+      id: 'ev-9-r1',
+      from: rect(100, 120, 38, 53),
+      to: rect(600, 200, 38, 53),
+      ...over,
+    });
+
+  it('un rival: solo reverso, de su asiento al mazo, y avisa al llegar', async () => {
+    const onLand = vi.fn();
+    render(<DrawLayer flights={[back()]} onLand={onLand} />);
+    expect(document.querySelector('.ll-flyer .ll-card')).toBeNull();
+    expect(document.querySelector('.ll-flyer-back')).not.toBeNull();
+    await waitFor(() => expect(onLand).toHaveBeenCalledOnce(), { timeout: 2000 });
+  });
+
+  it('tuya: sale con su cara (grande, con arte) y lleva el volteo a reverso', () => {
+    render(
+      <DrawLayer
+        flights={[back({ mine: true, card: 8, from: rect(300, 400, 166, 232) })]}
+        onLand={() => undefined}
+      />,
+    );
+    const flyer = document.querySelector('.ll-flyer') as HTMLElement;
+    expect(flyer.style.width).toBe('166px');
+    expect(flyer.querySelector('.ll-flyer-flip .ll-flyer-face .ll-card')).not.toBeNull();
+    expect(flyer.querySelector('.ll-flyer-flip .ll-flyer-back')).not.toBeNull();
+  });
+
+  it('varias a la vez comparten capa y salen escalonadas', () => {
+    render(
+      <DrawLayer
+        flights={[back({ id: 'a', delay: 0 }), back({ id: 'b', delay: 0.12 })]}
+        onLand={() => undefined}
+      />,
+    );
+    expect(document.querySelectorAll('.ll-flights .ll-flyer')).toHaveLength(2);
+  });
+});

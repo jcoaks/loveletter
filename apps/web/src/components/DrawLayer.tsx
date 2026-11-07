@@ -14,6 +14,8 @@ export interface Rect {
 /** Una carta en vuelo: del mazo (`from`) al hueco real de destino (`to`). */
 export interface Flight {
   id: string;
+  /** `draw`: del mazo al hueco de quien roba. `return`: de quien resuelve el Canciller al fondo del mazo. */
+  kind?: 'draw' | 'return';
   playerId: string;
   /** Tú robas: vuela a tu mano, crece y se voltea para enseñar su cara. */
   mine: boolean;
@@ -28,6 +30,60 @@ export interface Flight {
 
 export const FLIGHT_SECONDS = 0.6;
 const BACK = 'url(/assets/card-back.webp) center / 100% 100% no-repeat, #5a1d38';
+
+/** Vuelo de regreso al mazo: la carta (cara si es tuya) encoge, gira a reverso y se cuela bajo la pila. */
+function ReturnView({ flight, onLand }: { flight: Flight; onLand: (f: Flight) => void }) {
+  const { from, to, delay, mine, card } = flight;
+  const d = flight.duration ?? FLIGHT_SECONDS;
+  const style = {
+    width: from.width,
+    height: from.height,
+    '--card-w-lg': `${from.width}px`,
+    transformOrigin: '0 0',
+    transformPerspective: 900,
+  } as CSSProperties;
+  const end = Math.max(0.2, to.width / from.width);
+  const arc = (ease: [number, number, number, number]) => ({ duration: d, delay, ease });
+  return (
+    <motion.div
+      className="ll-flyer"
+      style={style}
+      initial={{ x: from.left, y: from.top, scale: 1, rotate: 5, opacity: 0 }}
+      animate={{
+        x: to.left + 5,
+        y: to.top + 5,
+        scale: end,
+        rotate: -4,
+        opacity: [1, 1, 0],
+      }}
+      transition={{
+        x: arc([0.45, 0, 0.2, 1]),
+        y: arc([0.22, 1, 0.36, 1]),
+        scale: arc([0.45, 0, 0.2, 1]),
+        rotate: arc([0.22, 1, 0.36, 1]),
+        // Se cuela bajo la pila: se desvanece justo al llegar.
+        opacity: { duration: d, delay, times: [0, 0.8, 1], ease: 'linear' },
+      }}
+      onAnimationComplete={() => onLand(flight)}
+    >
+      {mine && card !== undefined ? (
+        <motion.div
+          className="ll-flyer-flip"
+          initial={{ rotateY: 0 }}
+          animate={{ rotateY: 180 }}
+          transition={{ duration: d * 0.45, delay: delay + d * 0.2, ease: 'easeInOut' }}
+        >
+          <span className="ll-flyer-back" style={{ background: BACK }} />
+          <span className="ll-flyer-face">
+            <Card value={card} ariaLabel="" />
+          </span>
+        </motion.div>
+      ) : (
+        <span className="ll-flyer-back plain" style={{ background: BACK }} />
+      )}
+    </motion.div>
+  );
+}
 
 function FlightView({ flight, onLand }: { flight: Flight; onLand: (f: Flight) => void }) {
   const { from, to, delay, mine, card } = flight;
@@ -88,9 +144,13 @@ export function DrawLayer({
 }) {
   return createPortal(
     <div className="ll-flights" aria-hidden="true">
-      {flights.map((f) => (
-        <FlightView key={f.id} flight={f} onLand={onLand} />
-      ))}
+      {flights.map((f) =>
+        f.kind === 'return' ? (
+          <ReturnView key={f.id} flight={f} onLand={onLand} />
+        ) : (
+          <FlightView key={f.id} flight={f} onLand={onLand} />
+        ),
+      )}
     </div>,
     document.body,
   );

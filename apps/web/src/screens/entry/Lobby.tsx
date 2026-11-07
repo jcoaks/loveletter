@@ -1,10 +1,11 @@
 import { formatRoomCode, type RoomPlayer, type RoomView } from '@loveletter/protocol';
-import { useState } from 'react';
+import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import { LogoLockup } from '../../components/LogoLockup';
 import { ReadySeal } from '../../components/ReadySeal';
 import { RulesModal } from '../../components/RulesContent';
+import { type ToastItem, ToastStack } from '../../components/ToastStack';
 import { useCanAct, useRoom } from '../../hooks/room';
-import { TOKENS_TO_WIN } from '../../lib/cards';
+import { CARDS, TOKENS_TO_WIN } from '../../lib/cards';
 import { useRoomStore } from '../../store/room';
 import { useUiStore } from '../../store/ui';
 
@@ -17,10 +18,37 @@ async function copyText(text: string): Promise<boolean> {
   }
 }
 
-/** Sala de espera: invitación, quién está sentado, bots, listo e inicio. */
+const DECK_SIZE = CARDS.reduce((n, c) => n + c.copies, 0);
+
+/** Avisos discretos cuando alguien se sienta o se levanta de la mesa (no al abrir la pantalla). */
+function useTableToasts(players: readonly RoomPlayer[], youId: string) {
+  const known = useRef<Map<string, RoomPlayer> | null>(null);
+  const [items, setItems] = useState<ToastItem[]>([]);
+  useEffect(() => {
+    const now = new Map(players.map((p) => [p.id, p]));
+    const before = known.current;
+    known.current = now;
+    if (!before) return;
+    const fresh: ToastItem[] = [];
+    // Solo personas: los bots los añade el anfitrión y se ven en la mesa al instante.
+    for (const [id, p] of now) {
+      if (!before.has(id) && id !== youId && !p.bot)
+        fresh.push({ key: `in-${id}`, body: `${p.name} se sentó a la mesa`, ms: 3500 });
+    }
+    for (const [id, p] of before) {
+      if (!now.has(id) && !p.bot)
+        fresh.push({ key: `out-${id}-${now.size}`, body: `${p.name} dejó la mesa`, ms: 3500 });
+    }
+    if (fresh.length) setItems((s) => [...s, ...fresh]);
+  }, [players, youId]);
+  return { items, dismiss: (key: string) => setItems((s) => s.filter((i) => i.key !== key)) };
+}
+
+/** Sala de espera: invitación, mesa de jugadores, ajustes del anfitrión, listo e inicio. */
 export function LobbyScreen() {
   const room = useRoom();
   const send = useRoomStore((s) => s.send);
+  const status = useRoomStore((s) => s.status);
   const canAct = useCanAct();
   const openDialog = useUiStore((s) => s.openDialog);
   const dialog = useUiStore((s) => s.dialog);
@@ -30,18 +58,30 @@ export function LobbyScreen() {
   const count = room.players.length;
   const readyCount = room.players.filter((p) => p.ready || p.bot).length;
   const goal = TOKENS_TO_WIN[count];
+  const toasts = useTableToasts(room.players, room.you.id);
+  const waitingFor = room.players.filter((p) => !p.bot && !p.ready).map((p) => p.name);
   const startLabel =
     count < minPlayers
       ? `Faltan jugadores (mínimo ${minPlayers})`
       : room.canStart
         ? 'Comenzar la partida'
         : 'Esperando a que todos estén listos';
+  const reason =
+    count < minPlayers
+      ? `Se necesitan al menos ${minPlayers} jugadores: invita a alguien o añade un bot.`
+      : room.canStart
+        ? 'Todo listo: cuando quieras, empieza.'
+        : waitingFor.length > 0
+          ? `Falta que marquen listo: ${waitingFor.join(', ')}.`
+          : 'Esperando a que la sala esté lista.';
+  const empty = Math.max(0, maxPlayers - count);
+  const offline = status === 'reconnecting' || status === 'connecting';
 
   return (
-    <main className="mx-auto grid max-w-[1000px] gap-6 px-4 py-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
+    <main className="lb">
+      <header className="lb-bar">
         <LogoLockup height={36} />
-        <div className="flex items-center gap-2">
+        <div className="lb-bar-btns">
           <button type="button" className="ll-ghost" onClick={() => openDialog('rules')}>
             Reglas
           </button>
@@ -51,83 +91,166 @@ export function LobbyScreen() {
         </div>
       </header>
 
-      <div className="flex items-center gap-4">
-        <h1 className="m-0 font-display text-3xl tracking-wider">La mesa espera</h1>
-        <img
-          src="/assets/princess.webp"
-          alt=""
-          width={330}
-          height={460}
-          loading="lazy"
-          decoding="async"
-          className="hidden h-24 w-auto opacity-90 sm:block"
-        />
-      </div>
-      <InviteCard code={room.code} />
-
-      <section className="grid gap-3" aria-labelledby="h-jug">
-        <div className="flex flex-wrap justify-between gap-2">
-          <h2 id="h-jug" className="m-0 font-display text-xl tracking-wider">
-            Jugadores · {count} de {maxPlayers}
-          </h2>
-          <span className="ll-lbl" aria-live="polite">
-            {readyCount} de {count} listos
-          </span>
-        </div>
-        <ul className="m-0 grid list-none gap-2 p-0 sm:grid-cols-2">
-          {room.players.map((p) => (
-            <PlayerRow key={p.id} player={p} room={room} canAct={canAct} />
-          ))}
-          {room.you.isHost && count < maxPlayers && (
-            <li className="flex">
-              <button
-                type="button"
-                className="ll-ghost flex-1"
-                style={{ borderStyle: 'dashed', minHeight: 64 }}
-                disabled={!canAct}
-                onClick={() => send({ type: 'configure', config: { bots: room.config.bots + 1 } })}
-              >
-                + Añadir un bot
-              </button>
-            </li>
-          )}
-        </ul>
-        <p className="m-0 text-ivory/80">
-          De {minPlayers} a {maxPlayers} jugadores.{' '}
-          {goal
-            ? `Con ${count} jugadores se gana con ${goal} fichas de afecto.`
-            : 'Hacen falta al menos 2 jugadores para empezar.'}
+      {offline && (
+        <p className="lb-offline" role="status">
+          Reconectando con la sala… Tus cambios se enviarán cuando vuelva la conexión.
         </p>
-      </section>
+      )}
 
-      <div className="ll-lobby-cta grid gap-3 sm:grid-cols-2">
-        {you && !you.bot && (
-          <button
-            type="button"
-            className={you.ready ? 'll-play' : 'll-ghost'}
-            aria-pressed={you.ready}
-            disabled={!canAct}
-            onClick={() => send({ type: 'set_ready', ready: !you.ready })}
-          >
-            {you.ready ? 'Estoy listo' : '¿Listo para jugar?'}
-          </button>
+      <div className="lb-grid">
+        <div className="lb-title">
+          <div>
+            <h1 className="m-0 font-display text-3xl tracking-wider">La mesa espera</h1>
+            <p className="lb-count" aria-live="polite">
+              <b className="lb-count-n">
+                {count} de {maxPlayers}
+              </b>{' '}
+              jugadores{goal ? ` · meta de ${goal} fichas` : ''}
+            </p>
+          </div>
+          <img
+            src="/assets/princess.webp"
+            alt=""
+            width={330}
+            height={460}
+            loading="lazy"
+            decoding="async"
+            className="lb-princess"
+          />
+        </div>
+
+        <InviteCard code={room.code} />
+
+        <section className="lb-table" aria-labelledby="h-jug">
+          <div className="lb-table-hd">
+            <h2 id="h-jug" className="m-0 font-display text-xl tracking-wider">
+              Jugadores · {count} de {maxPlayers}
+            </h2>
+            <span className="ll-lbl" aria-live="polite">
+              {readyCount} de {count} listos
+            </span>
+          </div>
+          <ul className="lb-seats">
+            {room.players.map((p) => (
+              <PlayerRow key={p.id} player={p} room={room} canAct={canAct} />
+            ))}
+            {Array.from({ length: empty }, (_, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: huecos idénticos
+              <li key={i} className="lb-seat empty" style={{ '--i': i } as CSSProperties}>
+                <span className="lb-avatar" aria-hidden="true" />
+                <span className="lb-empty-txt">Esperando jugador…</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        {room.you.isHost && (
+          <section className="lb-host" aria-labelledby="h-host">
+            <h2 id="h-host" className="lb-h">
+              Ajustes de la mesa
+            </h2>
+            <div className="lb-stepper">
+              <span id="bots-lbl" className="lb-stepper-lbl">
+                Bots
+                <small className="lb-stepper-sub">Completan la mesa y juegan solos</small>
+              </span>
+              {/* biome-ignore lint/a11y/useSemanticElements: grupo con nombre accesible, no un formulario */}
+              <div className="lb-stepper-ctl" role="group" aria-labelledby="bots-lbl">
+                <button
+                  type="button"
+                  className="lb-step"
+                  aria-label="Quitar un bot"
+                  disabled={!canAct || room.config.bots <= 0}
+                  onClick={() =>
+                    send({ type: 'configure', config: { bots: Math.max(0, room.config.bots - 1) } })
+                  }
+                >
+                  −
+                </button>
+                <output className="lb-step-n" aria-live="polite">
+                  {room.config.bots}
+                </output>
+                <button
+                  type="button"
+                  className="lb-step"
+                  aria-label="Añadir un bot"
+                  disabled={!canAct || count >= maxPlayers}
+                  onClick={() =>
+                    send({ type: 'configure', config: { bots: room.config.bots + 1 } })
+                  }
+                >
+                  +
+                </button>
+              </div>
+            </div>
+            <p className="lb-sum">
+              Mazo de {DECK_SIZE} cartas, edición con Espía y Canciller. De {minPlayers} a{' '}
+              {maxPlayers} jugadores.{' '}
+              {goal
+                ? `Con ${count} jugadores se gana con ${goal} fichas de afecto.`
+                : 'Hacen falta al menos 2 jugadores para empezar.'}
+            </p>
+          </section>
         )}
-        {room.you.isHost ? (
-          <button
-            type="button"
-            className="ll-play"
-            disabled={!room.canStart || !canAct}
-            onClick={() => send({ type: 'start' })}
-          >
-            {startLabel}
-          </button>
-        ) : (
-          <p className="m-0 self-center text-ivory/80">
-            El anfitrión comenzará la partida cuando todos estén listos.
+        {!room.you.isHost && (
+          <p className="lb-sum lb-sum-guest">
+            Mazo de {DECK_SIZE} cartas, edición con Espía y Canciller.{' '}
+            {goal
+              ? `Con ${count} jugadores se gana con ${goal} fichas de afecto.`
+              : 'Hacen falta al menos 2 jugadores para empezar.'}
           </p>
         )}
+
+        <section className="lb-how" aria-labelledby="h-how">
+          <h2 id="h-how" className="lb-h">
+            Cómo se juega
+          </h2>
+          <ol className="lb-how-list">
+            <li>En tu turno robas una carta y juegas una de las dos que tienes.</li>
+            <li>Cada carta tiene un efecto: adivinar, espiar, comparar, proteger…</li>
+            <li>Gana la ronda quien queda en pie o tiene la carta más alta.</li>
+          </ol>
+          <button type="button" className="lb-link" onClick={() => openDialog('rules')}>
+            Leer las reglas completas
+          </button>
+        </section>
+
+        <div className="lb-cta ll-lobby-cta">
+          {you && !you.bot && (
+            <button
+              type="button"
+              className={you.ready ? 'll-play' : 'll-ghost'}
+              aria-pressed={you.ready}
+              disabled={!canAct}
+              onClick={() => send({ type: 'set_ready', ready: !you.ready })}
+            >
+              {you.ready ? 'Estoy listo' : '¿Listo para jugar?'}
+            </button>
+          )}
+          {room.you.isHost ? (
+            <div className="lb-start">
+              <button
+                type="button"
+                className="ll-play"
+                disabled={!room.canStart || !canAct}
+                aria-describedby="start-why"
+                onClick={() => send({ type: 'start' })}
+              >
+                {startLabel}
+              </button>
+              <span id="start-why" className="lb-why">
+                {reason}
+              </span>
+            </div>
+          ) : (
+            <p className="lb-why lb-why-guest">
+              El anfitrión comenzará la partida cuando todos estén listos.
+            </p>
+          )}
+        </div>
       </div>
       {dialog === 'rules' && <RulesModal onClose={closeDialog} />}
+      <ToastStack items={toasts.items} onDismiss={toasts.dismiss} />
     </main>
   );
 }
@@ -155,18 +278,28 @@ function InviteCard({ code }: { code: string }) {
     }
   }
   return (
-    <div className="ll-panel ll-invite">
-      <div>
-        <span className="ll-lbl">Código de sala</span>
-        <div className="ll-invite-code">{formatted}</div>
-      </div>
-      <div className="ll-invite-btns">
+    <section className="lb-invite" aria-label="Invitación a la sala">
+      <img
+        className="lb-invite-seal"
+        src="/assets/seal.webp"
+        alt=""
+        width={112}
+        height={112}
+        decoding="async"
+      />
+      <span className="lb-invite-lbl">Invitación · código de sala</span>
+      <div className="lb-invite-code">{formatted}</div>
+      <div className="lb-invite-btns">
         {canShare && (
-          <button type="button" className="ll-play ll-invite-share" onClick={share}>
+          <button type="button" className="ll-play lb-share" onClick={share}>
             Compartir invitación
           </button>
         )}
-        <button type="button" className="ll-ghost" onClick={() => copy('link')}>
+        <button
+          type="button"
+          className={canShare ? 'll-ghost' : 'll-play lb-share'}
+          onClick={() => copy('link')}
+        >
           {copied === 'link' ? 'Enlace copiado' : 'Copiar enlace'}
         </button>
         <button type="button" className="ll-ghost" onClick={() => copy('code')}>
@@ -176,7 +309,7 @@ function InviteCard({ code }: { code: string }) {
       <span role="status" className="ll-err basis-full empty:hidden">
         {copied === 'fail' ? `Cópialo a mano: ${link}` : ''}
       </span>
-    </div>
+    </section>
   );
 }
 
@@ -191,6 +324,7 @@ function PlayerRow({
 }) {
   const send = useRoomStore((s) => s.send);
   const isYou = player.id === room.you.id;
+  const isHost = player.id === room.hostId;
   const canRemove = room.you.isHost && !isYou;
   const status = player.bot
     ? 'Bot · siempre listo'
@@ -199,26 +333,47 @@ function PlayerRow({
       : player.ready
         ? 'Listo'
         : 'Esperando';
+  const online = player.bot || player.connected;
   return (
-    <li className="flex items-center gap-3 rounded-xl border border-gold/30 bg-black/25 px-3 py-2">
-      <span className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate font-display tracking-wider">
+    <li className={`lb-seat${isYou ? ' you' : ''}${online ? '' : ' off'}`}>
+      <span
+        className={`lb-avatar${player.bot ? ' bot' : ''}`}
+        data-initial={player.bot ? '' : player.name.trim().charAt(0).toUpperCase()}
+        aria-hidden="true"
+      >
+        {player.bot && (
+          <svg
+            aria-hidden="true"
+            className="lb-avatar-ico"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M12 3v3M7 7h10a3 3 0 013 3v6a3 3 0 01-3 3H7a3 3 0 01-3-3v-6a3 3 0 013-3zM9 12h.01M15 12h.01M9 16h6" />
+          </svg>
+        )}
+        {isHost && (
+          <svg aria-hidden="true" className="lb-crown" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M3 18l1.5-10 5 5L12 5l2.5 8 5-5L21 18zM4 21h16v-2H4z" />
+          </svg>
+        )}
+      </span>
+      <span className="lb-seat-txt">
+        <span className="lb-name">
           {isYou ? `${player.name} (tú)` : player.name}
-          {player.id === room.hostId && <i className="ll-chip on ml-2">Anfitrión</i>}
+          {isHost && <i className="ll-chip on ml-2">Anfitrión</i>}
           {player.bot && <i className="ll-chip ml-2">Bot</i>}
         </span>
-        <span
-          className={`text-sm ${player.bot || player.ready ? 'text-ivory/75' : 'text-ivory/45'}`}
-        >
-          {status}
-        </span>
+        <span className={`lb-status${online ? '' : ' warn'}`}>{status}</span>
       </span>
       <ReadySeal ready={player.bot || player.ready} fixed={player.bot} />
       {canRemove && (
         <button
           type="button"
-          className="ll-x"
-          style={{ width: 44, height: 44, fontSize: 22 }}
+          className="ll-x lb-x"
           disabled={!canAct}
           aria-label={`${player.bot ? 'Quitar' : 'Expulsar'} a ${player.name}`}
           onClick={() =>

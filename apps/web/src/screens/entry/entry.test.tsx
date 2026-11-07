@@ -1,3 +1,4 @@
+import type { RoomView } from '@loveletter/protocol';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useParams } from 'react-router';
@@ -214,13 +215,116 @@ describe('Sala de espera', () => {
     expect(screen.getByText('KX7-QM2')).toBeInTheDocument();
     expect(screen.getByText(/Con 3 jugadores se gana con 5 fichas/)).toBeInTheDocument();
     expect(screen.getByText('Bot · siempre listo')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: '+ Añadir un bot' }));
+    await user.click(screen.getByRole('button', { name: 'Añadir un bot' }));
     expect(send).toHaveBeenLastCalledWith({ type: 'configure', config: { bots: 2 } });
     await user.click(screen.getByRole('button', { name: 'Quitar a Robo' }));
+    expect(send).toHaveBeenLastCalledWith({ type: 'configure', config: { bots: 0 } });
+    await user.click(screen.getByRole('button', { name: 'Quitar un bot' }));
     expect(send).toHaveBeenLastCalledWith({ type: 'configure', config: { bots: 0 } });
     await user.click(screen.getByRole('button', { name: 'Expulsar a Beto' }));
     expect(send).toHaveBeenLastCalledWith({ type: 'kick', playerId: 'b' });
     expect(screen.getByRole('button', { name: /Esperando a que todos/ })).toBeDisabled();
+  });
+
+  const human = (id: string, name: string, over: object = {}) => ({
+    id,
+    name,
+    ready: false,
+    connected: true,
+    left: false,
+    bot: false,
+    host: false,
+    ...over,
+  });
+
+  it('los asientos libres se muestran como huecos que invitan a unirse', () => {
+    setup(true);
+    // 3 jugadores en una mesa de 6: quedan 3 huecos.
+    expect(screen.getAllByText('Esperando jugador…')).toHaveLength(3);
+    expect(screen.getByText(/3 de 6/, { selector: 'b' })).toBeInTheDocument();
+  });
+
+  it('el anfitrión lleva corona y el resto de jugadores tiene su inicial; los bots, insignia', () => {
+    setup(true);
+    const ana = screen
+      .getAllByRole('listitem')
+      .find((li) => li.textContent?.startsWith('Ana')) as HTMLElement;
+    expect(ana.querySelector('.lb-crown')).not.toBeNull();
+    expect(within(ana).getByText('Anfitrión')).toBeInTheDocument();
+    expect(ana.querySelector('.lb-avatar')?.getAttribute('data-initial')).toBe('A');
+    const robo = screen
+      .getAllByRole('listitem')
+      .find((li) => li.textContent?.startsWith('Robo')) as HTMLElement;
+    expect(robo.querySelector('.lb-avatar.bot')).not.toBeNull();
+    expect(within(robo).getByText('Bot')).toBeInTheDocument();
+  });
+
+  it('el selector de bots respeta los límites', () => {
+    setup(true, { config: { bots: 0 } });
+    expect(screen.getByRole('button', { name: 'Quitar un bot' })).toBeDisabled();
+    cleanup();
+    const six = ['a', 'b', 'c', 'd', 'e', 'f'].map((id, i) =>
+      human(id, `J${i}`, { host: id === 'a' }),
+    );
+    setup(true, { players: six, config: { bots: 2 } });
+    expect(screen.getByRole('button', { name: 'Añadir un bot' })).toBeDisabled();
+    expect(screen.queryByText('Esperando jugador…')).toBeNull();
+  });
+
+  it('explica por qué no se puede empezar', () => {
+    setup(true, {
+      players: [human('a', 'Ana', { ready: true, host: true })],
+    });
+    expect(screen.getByRole('button', { name: /Faltan jugadores/ })).toBeDisabled();
+    expect(screen.getByText(/Se necesitan al menos 2 jugadores/)).toBeInTheDocument();
+    cleanup();
+    setup(true);
+    expect(screen.getByText('Falta que marquen listo: Beto.')).toBeInTheDocument();
+    cleanup();
+    setup(true, { canStart: true });
+    expect(screen.getByText(/Todo listo/)).toBeInTheDocument();
+  });
+
+  it('el invitado ve el resumen pero no los ajustes del anfitrión', () => {
+    setup(false);
+    expect(screen.queryByRole('button', { name: 'Quitar un bot' })).toBeNull();
+    expect(
+      screen.getByText(/Mazo de 21 cartas, edición con Espía y Canciller/),
+    ).toBeInTheDocument();
+  });
+
+  it('avisa de la conexión perdida', () => {
+    setup(true);
+    expect(screen.queryByText(/Reconectando con la sala/)).toBeNull();
+    cleanup();
+    useRoomStore.setState({ status: 'reconnecting' });
+    render(
+      <MemoryRouter>
+        <LobbyScreen />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText(/Reconectando con la sala/)).toBeInTheDocument();
+  });
+
+  it('un aviso discreto cuando se sienta una persona, pero no por los bots', async () => {
+    setup(true);
+    const base = useRoomStore.getState().room as RoomView;
+    useRoomStore.setState({
+      room: { ...base, players: [...base.players, human('d', 'Dani')] },
+    });
+    expect(await screen.findByText('Dani se sentó a la mesa')).toBeInTheDocument();
+    useRoomStore.setState({
+      room: {
+        ...base,
+        players: [
+          ...base.players,
+          human('d', 'Dani'),
+          { ...human('z', 'Zoe'), bot: true, ready: true },
+        ],
+      },
+    });
+    await waitFor(() => expect(screen.getAllByText('Zoe').length).toBeGreaterThan(0));
+    expect(screen.queryByText('Zoe se sentó a la mesa')).toBeNull();
   });
 
   it('inicia cuando la sala lo permite', async () => {
@@ -231,7 +335,7 @@ describe('Sala de espera', () => {
 
   it('un invitado marca listo y no ve controles de anfitrión', async () => {
     const { send, user } = setup(false);
-    expect(screen.queryByRole('button', { name: '+ Añadir un bot' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Añadir un bot' })).toBeNull();
     expect(screen.queryByRole('button', { name: /Expulsar/ })).toBeNull();
     await user.click(screen.getByRole('button', { name: '¿Listo para jugar?' }));
     expect(send).toHaveBeenCalledWith({ type: 'set_ready', ready: true });

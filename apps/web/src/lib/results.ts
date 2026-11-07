@@ -22,6 +22,8 @@ export interface TableResult {
   hit: boolean;
   /** "Qué hace" la carta jugada, en una frase corta (en espejo para quien la juega). */
   effect?: string;
+  /** Espera estos milisegundos antes de mostrarse (el vuelo de las cartas se ve primero). */
+  deferMs?: number;
   /** Lo que solo tú ves de esta jugada (Sacerdote, Rey, Barón, Príncipe sobre ti). */
   secretFaces?: ResultFace[];
   /** Presente cuando es la jugada de otro jugador (aviso informativo). */
@@ -163,6 +165,7 @@ export function buildResults(
         faces,
         visibility: 'private',
         hit: false,
+        deferMs: 1500,
       });
     }
   }

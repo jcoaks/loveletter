@@ -83,7 +83,12 @@ function useResults(ctx: TextContext, mode: NoticeMode) {
       r.style === 'toast' || (r.other !== undefined && mode === 'brief' && !r.other.affectsMe);
     const modals = results.filter((r) => !isToast(r));
     const light = results.filter(isToast);
-    if (modals.length) setQueue((q) => [...q, ...modals]);
+    const quick = modals.filter((r) => !r.deferMs);
+    if (quick.length) setQueue((q) => [...q, ...quick]);
+    for (const r of modals.filter((m) => m.deferMs)) {
+      const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      window.setTimeout(() => setQueue((q) => [...q, r]), reduced ? 0 : (r.deferMs ?? 0));
+    }
     if (light.length) setToasts((t) => [...t, ...light]);
   }, [game.events]);
   return {
@@ -94,6 +99,8 @@ function useResults(ctx: TextContext, mode: NoticeMode) {
     rememberChancellor: (pick: ChancellorPick) => {
       chancellor.current = pick;
     },
+    /** Lo que devolviste al fondo con el Canciller, en orden (para animar el regreso al mazo). */
+    pick: () => chancellor.current?.bottom ?? null,
   };
 }
 
@@ -156,7 +163,7 @@ export function GameScreen() {
     dialog !== null ||
     logOpen ||
     menuOpen;
-  const draws = useDraws(game, modalOpen);
+  const draws = useDraws(game, modalOpen, () => results.pick());
   const baseSeats = useMemo(() => seatsOf(game, room), [game, room]);
   const seats = useMemo(
     () => ({
@@ -421,7 +428,7 @@ export function GameScreen() {
         <TableLayout
           rivals={seats.rivals}
           toWin={toWin}
-          deckCount={game.deckSize}
+          deckCount={Math.max(0, game.deckSize - draws.deckHold)}
           setAside={{ hidden: game.hasSetAside ? 1 : 0, faceUp: game.faceUp }}
           turn={
             <TurnBanner

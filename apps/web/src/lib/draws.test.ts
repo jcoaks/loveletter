@@ -69,7 +69,7 @@ describe('drawAnimations', () => {
     let s = rig({ hands: [[4, 2], [4], [4], [4]], deck: [1, 1, 1, 1, 1, 1, 1, 1] });
     for (let i = 0; i < 4; i++) s = play(s, 4);
     const anims = drawAnimations(fresh(s, 'p0'), 'p0');
-    expect(anims.length).toBeLessThanOrEqual(3);
+    expect(anims.length).toBeLessThanOrEqual(6);
     expect(anims[0]?.delay).toBe(0);
     const delays = anims.map((a) => a.delay);
     expect([...delays].sort((a, b) => a - b)).toEqual(delays);
@@ -82,5 +82,55 @@ describe('drawAnimations', () => {
       events.length === 0 || events.every((e) => e.type === 'draw' && e.from === 'set_aside'),
     ).toBe(true);
     expect(drawAnimations(fresh(s, 'p1'), 'p1')).toEqual([]);
+  });
+});
+
+describe('drawAnimations: el Canciller devuelve al fondo', () => {
+  const chancellor = (deck: CardValue[], keep: CardValue, bottomOrder: CardValue[]) => {
+    const s = play(rig({ hands: [[6, 2], [3], [4]], deck }), 6);
+    return step(s, { type: 'chancellor_keep', playerId: 'p0', keep, bottomOrder });
+  };
+  const returns = (state: ReturnType<typeof rig>, me: string, bottom?: CardValue[]) =>
+    drawAnimations(fresh(state, me), me, bottom).filter((a) => a.kind === 'return');
+
+  it('devuelve 2: tuyas con sus caras, la más profunda llega primero y la primera en robarse queda encima', () => {
+    const s = chancellor([7, 8, 1, 1], 2, [8, 7]);
+    const r = returns(s, 'p0', [8, 7]);
+    expect(r).toHaveLength(2);
+    expect(r.every((a) => a.mine && a.playerId === 'p0')).toBe(true);
+    // bottomOrder[0] = 8 es la primera que se robará: queda encima y entra la segunda.
+    expect(r.map((a) => a.card)).toEqual([7, 8]);
+    expect(r[0]?.key).toMatch(/-r1$/);
+    expect((r[1]?.delay ?? 0) - (r[0]?.delay ?? 0)).toBeCloseTo(0.12);
+    // El Canciller se anima entero: las 2 que robó y las 2 que devuelve, en ese orden.
+    const all = drawAnimations(fresh(s, 'p0'), 'p0', [8, 7]);
+    // y luego el robo de inicio de turno del siguiente jugador.
+    expect(all.map((a) => a.kind)).toEqual(['draw', 'draw', 'return', 'return', 'draw']);
+  });
+
+  it('un rival ve dos reversos (sin caras) saliendo de su asiento', () => {
+    const s = chancellor([7, 8, 1, 1], 2, [8, 7]);
+    const r = returns(s, 'p1', [8, 7]);
+    expect(r).toHaveLength(2);
+    expect(r.every((a) => !a.mine && a.playerId === 'p0' && a.card === undefined)).toBe(true);
+  });
+
+  it('sin saber lo que elegiste (p. ej. recargaste) no inventa caras', () => {
+    const s = chancellor([7, 8, 1, 1], 2, [8, 7]);
+    expect(returns(s, 'p0').every((a) => a.card === undefined)).toBe(true);
+    expect(returns(s, 'p0', [8]).every((a) => a.card === undefined)).toBe(true);
+  });
+
+  it('devuelve 1 si el mazo solo tenía 1; con el mazo vacío no hay efecto ni vuelo', () => {
+    const one = chancellor([7], 2, [7]);
+    expect(returns(one, 'p0', [7])).toHaveLength(1);
+    const empty = play(rig({ hands: [[6, 2], [3], [4]], deck: [] }), 6);
+    expect(drawAnimations(fresh(empty, 'p0'), 'p0')).toEqual([]);
+  });
+
+  it('reconexión: sin sucesos nuevos no se repite', () => {
+    const s = chancellor([7, 8, 1, 1], 2, [8, 7]);
+    const last = viewFor(s, 'p0').events.at(-1)?.id ?? 0;
+    expect(drawAnimations(fresh(s, 'p0', last), 'p0', [8, 7])).toEqual([]);
   });
 });

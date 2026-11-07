@@ -1,4 +1,4 @@
-import type { PlayerView } from '@loveletter/engine';
+import type { CardValue, PlayerView } from '@loveletter/engine';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Flight, Rect } from '../components/DrawLayer';
 import { FLIGHT_SECONDS } from '../components/DrawLayer';
@@ -23,7 +23,12 @@ function reducedMotion(): boolean {
  * pantalla. Mientras una carta vuela, su hueco real sigue oculto (`pending`, por jugador) y se
  * muestra al aterrizar. Con movimiento reducido no hay vuelo: la carta aparece sin más.
  */
-export function useDraws(game: PlayerView, blocked = false) {
+export function useDraws(
+  game: PlayerView,
+  blocked = false,
+  /** Lo que devolviste al fondo con el Canciller (para enseñar sus caras en el vuelo). */
+  getBottom?: () => readonly CardValue[] | null,
+) {
   const seen = useRef<number | null>(null);
   const endAt = useRef(0);
   const waiting = useRef<DrawAnim[]>([]);
@@ -32,6 +37,8 @@ export function useDraws(game: PlayerView, blocked = false) {
   const [tick, setTick] = useState(0);
   const [flights, setFlights] = useState<Flight[]>([]);
   const [pending, setPending] = useState<Record<string, number>>({});
+  /** Cartas devueltas al fondo que aún vuelan: el contador del mazo no las cuenta hasta que llegan. */
+  const [deckHold, setDeckHold] = useState(0);
 
   const settle = useCallback((playerId: string) => {
     setPending((p) => {
@@ -53,7 +60,8 @@ export function useDraws(game: PlayerView, blocked = false) {
       // Solo se descuenta una vez por vuelo (puede aterrizar por la animación o por el temporizador).
       if (landed.current.has(f.id)) return;
       landed.current.add(f.id);
-      settle(f.playerId);
+      if (f.kind === 'return') setDeckHold((n) => Math.max(0, n - 1));
+      else settle(f.playerId);
     },
     [settle],
   );
@@ -68,6 +76,7 @@ export function useDraws(game: PlayerView, blocked = false) {
       waiting.current = [];
       setFlights([]);
       setPending({});
+      setDeckHold(0);
       return;
     }
     const base = seen.current;
@@ -75,14 +84,15 @@ export function useDraws(game: PlayerView, blocked = false) {
     if (fresh.length === 0) return;
     seen.current = lastId;
     if (reducedMotion()) return;
-    const anims = drawAnimations(fresh, game.you.id);
+    const anims = drawAnimations(fresh, game.you.id, getBottom?.());
     if (anims.length === 0) return;
     waiting.current.push(...anims);
     setPending((p) => {
       const next = { ...p };
-      for (const a of anims) next[a.playerId] = (next[a.playerId] ?? 0) + 1;
+      for (const a of anims) if (a.kind === 'draw') next[a.playerId] = (next[a.playerId] ?? 0) + 1;
       return next;
     });
+    setDeckHold((n) => n + anims.filter((a) => a.kind === 'return').length);
     setTick((t) => t + 1);
   }, [game.events]);
 
@@ -97,14 +107,46 @@ export function useDraws(game: PlayerView, blocked = false) {
       const now = performance.now();
       const wait = Math.max(0, endAt.current - now) / 1000;
       const handCards = Array.from(document.querySelectorAll('.ll-hand .ll-card'));
-      const mineCount = anims.filter((a) => a.mine).length;
+      const drawsMine = anims.filter((a) => a.kind === 'draw' && a.mine).length;
       const taken = new Map<string, number>();
       const added: Flight[] = [];
       let mineIdx = 0;
+      let returnIdx = 0;
       for (const a of anims) {
+        if (a.kind === 'return') {
+          // Del asiento (reversos) o de tu mano al fondo del mazo.
+          let from: Rect | null;
+          if (a.mine) {
+            const base = toRect(handCards[0] ?? document.querySelector('.ll-hand'));
+            from = base && { ...base, left: base.left + (returnIdx % 2 === 0 ? -14 : 14) };
+          } else {
+            const backs = document.querySelectorAll(
+              `[data-seat-id="${a.playerId}"] .ll-backs .ll-back`,
+            );
+            from = toRect(
+              backs[backs.length - 1] ?? document.querySelector(`[data-seat-id="${a.playerId}"]`),
+            );
+          }
+          returnIdx += 1;
+          if (!from || !deck) {
+            setDeckHold((n) => Math.max(0, n - 1));
+            continue;
+          }
+          added.push({
+            id: a.key,
+            kind: 'return',
+            playerId: a.playerId,
+            mine: a.mine,
+            card: a.card,
+            from,
+            to: deck,
+            delay: wait + a.delay,
+          });
+          continue;
+        }
         let to: Rect | null;
         if (a.mine) {
-          to = toRect(handCards[handCards.length - mineCount + mineIdx]);
+          to = toRect(handCards[handCards.length - drawsMine + mineIdx]);
           mineIdx += 1;
         } else {
           const n = taken.get(a.playerId) ?? 0;
@@ -112,7 +154,9 @@ export function useDraws(game: PlayerView, blocked = false) {
           const backs = document.querySelectorAll(
             `[data-seat-id="${a.playerId}"] .ll-backs .ll-back`,
           );
-          const total = anims.filter((x) => x.playerId === a.playerId && !x.mine).length;
+          const total = anims.filter(
+            (x) => x.kind === 'draw' && x.playerId === a.playerId && !x.mine,
+          ).length;
           to = toRect(backs[backs.length - total + n]);
         }
         if (!to || !deck) {
@@ -122,6 +166,7 @@ export function useDraws(game: PlayerView, blocked = false) {
         }
         added.push({
           id: a.key,
+          kind: 'draw',
           playerId: a.playerId,
           mine: a.mine,
           card: a.card,
@@ -141,5 +186,11 @@ export function useDraws(game: PlayerView, blocked = false) {
     return () => window.clearTimeout(timer);
   }, [tick, blocked]);
 
-  return { flights, pending, land, active: Object.keys(pending).length > 0 };
+  return {
+    flights,
+    pending,
+    deckHold,
+    land,
+    active: Object.keys(pending).length > 0 || deckHold > 0,
+  };
 }

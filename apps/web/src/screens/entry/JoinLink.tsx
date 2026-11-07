@@ -43,7 +43,7 @@ export function JoinLinkScreen({ code: rawCode }: { code: string }) {
     return (
       <EntryShell hero>
         <Logo width={260} />
-        <section className="ll-panel grid w-full max-w-[540px] gap-4" aria-labelledby="h-join">
+        <section className="lh-card grid w-full max-w-[540px] gap-4" aria-labelledby="h-join">
           <h1 id="h-join" className="m-0 font-display text-2xl tracking-wider">
             Unirse con un código
           </h1>
@@ -92,14 +92,14 @@ export function JoinLinkScreen({ code: rawCode }: { code: string }) {
         onSubmit={onSubmit}
         noValidate
         aria-labelledby="h-invite"
-        className="ll-panel grid w-full max-w-[520px] gap-4"
+        className="lh-card grid w-full max-w-[520px] gap-4"
       >
         <h1 id="h-invite" className="m-0 font-display text-2xl tracking-wider">
           {info?.hostName ? `${info.hostName} te invita a su mesa` : 'Te invitan a una mesa'}
         </h1>
         <div className="flex flex-wrap justify-between gap-2">
           <span className="ll-lbl">
-            Sala <b className="text-ivory">{code ? formatRoomCode(code) : rawCode}</b>
+            Sala <b className="text-ink">{code ? formatRoomCode(code) : rawCode}</b>
           </span>
           <span className="ll-lbl" aria-live="polite">
             {info ? `${info.playerCount} en la mesa` : 'Buscando la sala…'}
@@ -108,7 +108,7 @@ export function JoinLinkScreen({ code: rawCode }: { code: string }) {
         {info && info.playerNames.length > 0 && (
           <ul className="m-0 flex list-none flex-wrap gap-2 p-0" aria-label="En la mesa">
             {info.playerNames.map((n) => (
-              <li key={n} className="ll-chip">
+              <li key={n} className="ll-chip lh-chip">
                 {n === info.hostName ? `${n} · anfitrión` : n}
               </li>
             ))}
