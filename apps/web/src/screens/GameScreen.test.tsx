@@ -98,9 +98,47 @@ describe('GameScreen: jugadas', () => {
     await user.click(screen.getByRole('button', { name: 'Jugar Sacerdote' }));
     const d = within(dialog());
     expect(d.getByRole('button', { name: /Carla/ })).toHaveAttribute('aria-disabled', 'true');
-    expect(d.queryByRole('button', { name: /\(tú\)/ })).toBeNull();
     await user.click(d.getByRole('button', { name: /Beto/ }));
     expect(act).toHaveBeenCalledWith({ type: 'play_card', card: 2, targetId: 'p1' });
+  });
+
+  it.each<[CardValue, string, string]>([
+    [1, 'Guardia', 'Jugar Guardia'],
+    [2, 'Sacerdote', 'Jugar Sacerdote'],
+    [3, 'Barón', 'Jugar Barón'],
+    [7, 'Rey', 'Jugar Rey'],
+  ])('%i %s: tu cuadro aparece deshabilitado con tus descartes', async (card, _name, play) => {
+    const { user, act } = mount(rig({ hands: [[card, 9], [3], [4]], discards: { 0: [1, 1, 5] } }));
+    await user.click(screen.getByRole('button', { name: new RegExp(`^${card}, `) }));
+    await user.click(screen.getByRole('button', { name: play }));
+    const d = within(dialog());
+    const me = d.getByRole('button', { name: /Ana \(tú\)/ });
+    expect(me).toHaveAttribute('aria-disabled', 'true');
+    expect(me).toHaveClass('off');
+    expect(me).toHaveTextContent('No puedes elegirte');
+    expect(me).toHaveTextContent('3 descartes');
+    expect(me.querySelectorAll('.ll-fan .ll-card')).toHaveLength(3);
+    // Al final de la fila, sin cambiar el orden de los rivales.
+    const tiles = Array.from(dialog().querySelectorAll('.ll-ptile'));
+    expect(tiles[tiles.length - 1]).toBe(me);
+    expect(tiles.slice(0, 2).map((t) => t.querySelector('b')?.textContent)).toEqual([
+      'Beto',
+      'Carla',
+    ]);
+    await user.click(me);
+    expect(act).not.toHaveBeenCalled();
+    expect(d.queryByRole('button', { name: /^Acusar a/ })).toBeNull();
+  });
+
+  it('sin descartes, tu cuadro dice "Sin descartes"', async () => {
+    const { user } = mount(rig({ hands: [[2, 7], [3], [4]] }));
+    await user.click(screen.getByRole('button', { name: /^2, Sacerdote/ }));
+    await user.click(screen.getByRole('button', { name: 'Jugar Sacerdote' }));
+    expect(
+      within(within(dialog()).getByRole('button', { name: /Ana \(tú\)/ })).getByText(
+        'Sin descartes',
+      ),
+    ).toBeInTheDocument();
   });
 
   it('Príncipe: puedes elegirte y se muestra qué descartarías', async () => {
@@ -108,6 +146,8 @@ describe('GameScreen: jugadas', () => {
     await user.click(screen.getByRole('button', { name: 'Jugar Príncipe' }));
     const d = within(dialog());
     expect(d.getByText('Descartas Sacerdote y robas')).toBeInTheDocument();
+    // Con el Príncipe sí puedes elegirte: sigue habilitado.
+    expect(d.getByRole('button', { name: /Ana \(tú\)/ })).not.toHaveAttribute('aria-disabled');
     await user.click(d.getByRole('button', { name: /Ana \(tú\)/ }));
     expect(act).toHaveBeenCalledWith({ type: 'play_card', card: 5, targetId: 'p0' });
   });

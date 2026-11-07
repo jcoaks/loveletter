@@ -12,7 +12,7 @@ const players: PickerPlayer[] = [
 ];
 
 describe('PlayerPickerModal', () => {
-  it('con el Barón no ofrece al propio jugador y deshabilita no elegibles', async () => {
+  it('con el Barón tu cuadro va al final, deshabilitado, y se deshabilitan los no elegibles', async () => {
     const onPick = vi.fn();
     render(
       <PlayerPickerModal
@@ -23,7 +23,23 @@ describe('PlayerPickerModal', () => {
         onCancel={() => undefined}
       />,
     );
-    expect(screen.queryByText(/\(tú\)/)).not.toBeInTheDocument();
+    // Tu propio cuadro: al final, atenuado, con su estado y sin poder elegirse.
+    const tiles = screen.getAllByRole('button').filter((b) => b.classList.contains('ll-ptile'));
+    expect(tiles.map((t) => t.textContent?.split('No')[0])).toHaveLength(4);
+    const me = tiles[tiles.length - 1] as HTMLElement;
+    expect(me).toHaveTextContent('Tú (tú)');
+    expect(me).toHaveTextContent('No puedes elegirte');
+    expect(me).toHaveTextContent('Sin descartes');
+    expect(me).toHaveAttribute('aria-disabled', 'true');
+    expect(me).toHaveClass('off');
+    await userEvent.click(me);
+    expect(onPick).not.toHaveBeenCalled();
+    // Los rivales conservan su orden.
+    expect(tiles.slice(0, 3).map((t) => t.querySelector('b')?.textContent)).toEqual([
+      'Marta',
+      'Diego',
+      'Lucía',
+    ]);
     const marta = screen.getByRole('button', { name: /Marta/ });
     expect(marta).toHaveAttribute('aria-disabled', 'true');
     expect(marta).toHaveTextContent('Protegida');

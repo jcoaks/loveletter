@@ -79,45 +79,49 @@ export function PlayerPickerModal({
       }
     >
       <div className="ll-ptiles">
-        {players
-          .filter((p) => prince || !p.isMe)
-          .map((p) => {
-            const sub = p.isMe
-              ? restCard === undefined
+        {/* Los rivales conservan su orden; si no puedes elegirte, tu cuadro va al final, deshabilitado. */}
+        {(prince
+          ? players
+          : [...players.filter((p) => !p.isMe), ...players.filter((p) => p.isMe)]
+        ).map((p) => {
+          const sub = p.isMe
+            ? !prince
+              ? 'No puedes elegirte'
+              : restCard === undefined
                 ? 'Descartas tu mano y robas'
                 : `Descartas ${cardName(restCard)} y robas`
-              : p.eligible
-                ? (SUB[card] ?? '')
-                : agree(p.eliminated ? 'Eliminado' : 'Protegido', p.gender);
-            const inner = (
-              <>
-                <b>{labelName(p.name, p.isMe)}</b>
-                <span className="ll-lbl">{sub}</span>
-                <span className="ll-lbl">
-                  {p.discards.length === 0
-                    ? 'Sin descartes'
-                    : plural(p.discards.length, 'descarte', 'descartes')}
-                </span>
-                <CardFan cards={p.discards} wrap />
-                <Tokens count={p.tokens} total={toWin} />
-              </>
-            );
-            return p.eligible ? (
-              <button
-                key={p.id}
-                type="button"
-                className={`ll-ptile${p.isMe ? ' me' : ''}`}
-                aria-pressed={selectable ? selectedId === p.id : undefined}
-                onClick={() => onPick(p.id)}
-              >
-                {inner}
-              </button>
-            ) : (
-              <button key={p.id} type="button" className="ll-ptile off" aria-disabled="true">
-                {inner}
-              </button>
-            );
-          })}
+            : p.eligible
+              ? (SUB[card] ?? '')
+              : agree(p.eliminated ? 'Eliminado' : 'Protegido', p.gender);
+          const inner = (
+            <>
+              <b>{labelName(p.name, p.isMe)}</b>
+              <span className="ll-lbl">{sub}</span>
+              <span className="ll-lbl">
+                {p.discards.length === 0
+                  ? 'Sin descartes'
+                  : plural(p.discards.length, 'descarte', 'descartes')}
+              </span>
+              <CardFan cards={p.discards} wrap />
+              <Tokens count={p.tokens} total={toWin} />
+            </>
+          );
+          return p.eligible && (prince || !p.isMe) ? (
+            <button
+              key={p.id}
+              type="button"
+              className={`ll-ptile${p.isMe ? ' me' : ''}`}
+              aria-pressed={selectable ? selectedId === p.id : undefined}
+              onClick={() => onPick(p.id)}
+            >
+              {inner}
+            </button>
+          ) : (
+            <button key={p.id} type="button" className="ll-ptile off" aria-disabled="true">
+              {inner}
+            </button>
+          );
+        })}
       </div>
       {children}
     </Sheet>
