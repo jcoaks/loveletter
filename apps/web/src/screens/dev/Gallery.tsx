@@ -375,7 +375,15 @@ export function Gallery() {
         <RoundOverModal game={roundOverView()} onContinue={close} onHide={close} />
       )}
       {modal === 'discards' && (
-        <DiscardsModal name="Diego" discards={[2, 3, 1]} eliminated spyPlayed onClose={close} />
+        <DiscardsModal
+          name="Diego"
+          discards={[2, 3, 1]}
+          eliminated
+          spyPlayed
+          tokens={2}
+          toWin={4}
+          onClose={close}
+        />
       )}
     </main>
   );

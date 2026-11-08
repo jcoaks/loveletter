@@ -1269,6 +1269,11 @@ body {
   .ll-aside:focus-visible .ll-aside-pop {
     display: block;
   }
+  .ll-dfavor {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
   .ll-dwrap {
     display: grid;
     gap: 6px;

@@ -3,6 +3,7 @@ import { agree, type Gender } from '../lib/gender';
 import { plural } from '../lib/names';
 import { Card } from './Card';
 import { Sheet } from './Sheet';
+import { Tokens } from './Token';
 
 /** Descartes de un jugador, de la más antigua a la más reciente, con el efecto de cada carta. */
 export function DiscardsModal({
@@ -12,6 +13,8 @@ export function DiscardsModal({
   eliminated,
   protectedNow,
   spyPlayed,
+  tokens,
+  toWin,
   onClose,
 }: {
   name: string;
@@ -20,6 +23,9 @@ export function DiscardsModal({
   eliminated?: boolean;
   protectedNow?: boolean;
   spyPlayed?: boolean;
+  /** Fichas de favor del jugador y las necesarias para ganar. */
+  tokens?: number;
+  toWin?: number;
   onClose: () => void;
 }) {
   const last = discards.length - 1;
@@ -41,6 +47,14 @@ export function DiscardsModal({
       sub={`${plural(discards.length, 'carta', 'cartas')} · de la más antigua a la más reciente${notes.length ? ` · ${notes.join(' · ')}` : ''}`}
       onClose={onClose}
     >
+      {tokens !== undefined && toWin !== undefined && (
+        <div className="ll-dfavor">
+          <Tokens count={tokens} total={toWin} />
+          <span className="ll-lbl">
+            {tokens} de {toWin} {tokens === 1 ? 'ficha' : 'fichas'} de favor
+          </span>
+        </div>
+      )}
       {discards.length === 0 ? (
         <p className="ll-rtxt">Todavía no ha descartado nada.</p>
       ) : (

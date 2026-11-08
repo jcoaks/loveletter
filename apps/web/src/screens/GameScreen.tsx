@@ -598,6 +598,8 @@ export function GameScreen() {
           eliminated={seatShown.eliminated}
           protectedNow={seatShown.protected}
           spyPlayed={seatShown.spyPlayed}
+          tokens={seatShown.tokens}
+          toWin={toWin}
           onClose={() => setSeatInfo(null)}
         />
       )}
