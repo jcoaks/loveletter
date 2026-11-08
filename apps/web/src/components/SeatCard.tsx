@@ -76,7 +76,7 @@ export function SeatCard({
       </span>
       <span className="ll-seat-foot">
         <Tokens count={seat.tokens} total={toWin} />
-        <span className="ll-lbl">Descartes{onOpen ? ' · ver' : ''}</span>
+        <span className="ll-lbl">{onOpen ? 'Ver detalle' : 'Descartes'}</span>
       </span>
     </>
   );
@@ -119,7 +119,7 @@ export function MineBar({
   children?: ReactNode;
 }) {
   const cls = `ll-mine${seat.eliminated ? ' out' : ''}`;
-  const label = `Tus descartes: ${seat.discards.length ? seat.discards.length : 'ninguno'}. ${seat.tokens} de ${toWin} fichas.${onOpen ? ' Ver descartes' : ''}`;
+  const label = `Tus descartes: ${seat.discards.length ? seat.discards.length : 'ninguno'}. ${seat.tokens} de ${toWin} fichas.${onOpen ? ' Ver detalle' : ''}`;
   const body = (
     <>
       <span className="ll-lbl">Tus descartes{onOpen ? ' · ver detalle' : ''}</span>

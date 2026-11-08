@@ -59,5 +59,5 @@ export function seatLabel(seat: SeatData, toWin: number, clickable = true): stri
   const hand = seat.eliminated
     ? 'Sin cartas'
     : plural(seat.handCount, 'carta en mano', 'cartas en mano');
-  return `${seat.name}${info.length ? `, ${info.join(', ')}` : ''}. ${hand}. Descartes: ${discardsText(seat.discards)}. ${seat.tokens} de ${toWin} fichas.${clickable ? ' Ver descartes' : ''}`;
+  return `${seat.name}${info.length ? `, ${info.join(', ')}` : ''}. ${hand}. Descartes: ${discardsText(seat.discards)}. ${seat.tokens} de ${toWin} fichas.${clickable ? ' Ver detalle' : ''}`;
 }
