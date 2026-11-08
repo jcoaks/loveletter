@@ -601,18 +601,65 @@ body {
   .ll-seat.miss {
     box-shadow: 0 0 0 3px rgb(242 230 227 / 0.4);
   }
+  /* Cabecera de asiento de estructura fija: nombre, insignia de bot y ranura de estados. */
   .ll-hd {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    flex-wrap: wrap;
+    gap: 6px;
+    flex-wrap: nowrap;
+    min-width: 0;
   }
   .ll-hd b {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     font-family: var(--font-display);
     font-size: 15px;
     letter-spacing: 0.06em;
-    overflow-wrap: anywhere;
+  }
+  .ll-hd .ll-chip.bot {
+    flex: none;
+    padding: 0 6px;
+    font-size: 11px;
+    line-height: 18px;
+  }
+  /* Ranura de estados: reserva el sitio de dos iconos para que nada se mueva. */
+  .ll-st {
+    flex: none;
+    display: inline-flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 2px;
+    min-width: 42px;
+    height: 20px;
+  }
+  .ll-mine .ll-st {
+    min-width: 0;
+  }
+  .ll-ico {
+    width: 20px;
+    height: 20px;
+    background: currentColor;
+    -webkit-mask: var(--ico) center / 18px no-repeat;
+    mask: var(--ico) center / 18px no-repeat;
+  }
+  .ll-ico.prot {
+    color: var(--color-gold-light);
+    --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z'/%3E%3C/svg%3E");
+  }
+  .ll-ico.spy {
+    color: var(--color-gold);
+    --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z'/%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3C/svg%3E");
+  }
+  .ll-ico.out {
+    color: var(--color-rose);
+    --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 6l12 12M18 6L6 18'/%3E%3C/svg%3E");
+  }
+  .ll-ico.off {
+    color: var(--color-rose);
+    --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4l9 16H3zM12 10v4M12 17h.01'/%3E%3C/svg%3E");
   }
   .ll-chip {
     display: inline-block;
@@ -1878,66 +1925,35 @@ body {
       padding: 5px 7px 6px;
       border-radius: 10px;
     }
-    .ll-hd {
-      flex-wrap: wrap;
-      justify-content: flex-start;
-      gap: 2px 4px;
-      min-width: 0;
-    }
     .ll-hd b {
-      flex: 1 1 100%;
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
       font-size: 13px;
       letter-spacing: 0.03em;
     }
-    .ll-seat .ll-chip {
-      padding: 0 6px;
-      font-size: 12px;
+    /* Insignia de bot fija, en la esquina inferior derecha (el pie no usa ese hueco en móvil);
+       los estados, fijos en la esquina superior derecha. */
+    .ll-hd .ll-chip.bot {
+      position: absolute;
+      right: 7px;
+      bottom: 6px;
+      padding: 0 5px;
+      font-size: 10px;
+      line-height: 16px;
       letter-spacing: 0;
-      text-transform: none;
     }
-    .ll-seat .ll-chip.bot,
-    .ll-seat .ll-chip.spy,
-    .ll-seat .ll-chip.on {
-      display: none;
-    }
-    .ll-seat.turnof .ll-hd b {
-      color: var(--color-gold-light);
-    }
-    .ll-seat.turnof .ll-hd b::before {
-      content: "▸ ";
-    }
-    /* Estados que cambian lo que puedes hacer: un icono en la esquina (el texto va en el aria-label). */
-    .ll-seat .ll-chip.prot,
-    .ll-seat .ll-chip.out,
-    .ll-seat .ll-chip.off {
+    .ll-hd .ll-st {
       position: absolute;
       top: 4px;
       right: 5px;
-      width: 20px;
-      height: 20px;
-      padding: 0;
-      border: 0;
-      border-radius: 0;
-      font-size: 0;
-      background: currentColor;
-      -webkit-mask: var(--ico) center / 18px no-repeat;
-      mask: var(--ico) center / 18px no-repeat;
+      min-width: 0;
     }
-    .ll-seat .ll-chip.prot {
-      --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z'/%3E%3C/svg%3E");
-    }
-    .ll-seat .ll-chip.out {
-      --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 6l12 12M18 6L6 18'/%3E%3C/svg%3E");
-    }
-    .ll-seat .ll-chip.off {
-      --ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4l9 16H3zM12 10v4M12 17h.01'/%3E%3C/svg%3E");
-    }
-    .ll-seat:has(.ll-chip.prot, .ll-chip.out, .ll-chip.off) .ll-hd b {
+    .ll-hd b {
       padding-right: 22px;
+    }
+    .ll-seat:has(.ll-st .ll-ico + .ll-ico) .ll-hd b {
+      padding-right: 42px;
+    }
+    .ll-seat.turnof .ll-hd b {
+      color: var(--color-gold-light);
     }
     .ll-seat-row {
       --tot: 1;
@@ -2053,12 +2069,6 @@ body {
     }
     .ll-mine .ll-fan > * + * {
       margin-left: var(--ov);
-    }
-    .ll-mine .ll-chip {
-      flex: none;
-    }
-    .ll-mine .ll-chip.on {
-      display: none;
     }
 
     /* Barra de acciones: botón grande a la izquierda y la pista a su lado. */

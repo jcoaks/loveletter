@@ -1,7 +1,34 @@
 import type { CSSProperties, ReactNode } from 'react';
-import { type SeatData, seatChips, seatLabel } from '../lib/seat';
+import { agree } from '../lib/gender';
+import { type SeatData, seatLabel } from '../lib/seat';
 import { CardBack, CardFan } from './Card';
 import { Tokens } from './Token';
+
+/**
+ * Estados del asiento como iconos en una ranura de ancho fijo: aparecen y desaparecen sin
+ * mover el nombre ni el resto del cuadro. El texto va en `aria-label` y `title`.
+ */
+export function StatusIcons({ seat }: { seat: SeatData }) {
+  const items: { kind: 'out' | 'prot' | 'spy' | 'off'; label: string }[] = [];
+  if (seat.eliminated) items.push({ kind: 'out', label: agree('Eliminado', seat.gender) });
+  if (seat.protected) items.push({ kind: 'prot', label: agree('Protegido', seat.gender) });
+  if (seat.spyPlayed) items.push({ kind: 'spy', label: 'Espía jugado' });
+  if (seat.connected === false)
+    items.push({ kind: 'off', label: agree('Desconectado', seat.gender) });
+  return (
+    <span className="ll-st">
+      {items.map((i) => (
+        <i
+          key={i.kind}
+          className={`ll-ico ${i.kind}`}
+          role="img"
+          aria-label={i.label}
+          title={i.label}
+        />
+      ))}
+    </span>
+  );
+}
 
 export type SeatMark = 'hit' | 'miss' | 'picked';
 
@@ -28,11 +55,8 @@ export function SeatCard({
     <>
       <span className="ll-hd">
         <b>{seat.name}</b>
-        {seatChips(seat).map((c) => (
-          <i key={c.label} className={`ll-chip ${c.kind}${c.on ? ' on' : ''}`}>
-            {c.label}
-          </i>
-        ))}
+        {seat.bot && <i className="ll-chip bot">Bot</i>}
+        <StatusIcons seat={seat} />
       </span>
       <span
         className="ll-seat-row"
@@ -105,13 +129,7 @@ export function MineBar({
       <span className="ll-lbl">Tus descartes{onOpen ? ' · ver detalle' : ''}</span>
       <CardFan cards={seat.discards} />
       <Tokens count={seat.tokens} total={toWin} />
-      {seatChips(seat)
-        .filter((c) => !c.on)
-        .map((c) => (
-          <i key={c.label} className={`ll-chip ${c.kind}`}>
-            {c.label}
-          </i>
-        ))}
+      <StatusIcons seat={seat} />
       {children}
     </>
   );
