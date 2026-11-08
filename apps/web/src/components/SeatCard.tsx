@@ -58,15 +58,11 @@ export function SeatCard({
         {seat.bot && <i className="ll-chip bot">Bot</i>}
         <StatusIcons seat={seat} />
       </span>
-      <span
-        className="ll-seat-row"
-        style={
-          {
-            '--tot': Math.max(1, (seat.eliminated ? 0 : seat.handCount) + seat.discards.length),
-          } as CSSProperties
-        }
-      >
-        <span className="ll-backs">
+      <span className="ll-seat-row">
+        <span
+          className="ll-backs"
+          style={{ '--tot': Math.max(1, seat.eliminated ? 0 : seat.handCount) } as CSSProperties}
+        >
           {!seat.eliminated &&
             Array.from({ length: seat.handCount }, (_, i) => (
               <CardBack

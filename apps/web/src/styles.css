@@ -518,19 +518,35 @@ body {
       border-color 0.15s,
       background 0.15s;
   }
+  /* Dos filas de alto fijo: la mano (reversos) arriba y los descartes abajo. Cada fila se
+     solapa según su propio ancho disponible. */
   .ll-seat-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+    container-type: inline-size;
+    --ov: -4px;
+  }
+  .ll-seat-row .ll-backs,
+  .ll-seat-row .ll-fan {
+    --tot: 1;
+    --ov: clamp(
+      calc(var(--card-w-sm) * -0.64),
+      calc((100cqw - var(--tot) * var(--card-w-sm)) / (var(--tot) - 1)),
+      4px
+    );
+    padding: 0;
     min-width: 0;
     min-height: calc(var(--card-w-sm) * 1.4);
   }
-  .ll-seat-row .ll-fan {
-    min-height: 0;
-    flex: 1;
-    min-width: 0;
+  .ll-seat-row .ll-backs > *,
+  .ll-seat-row .ll-fan > * {
+    margin-left: var(--ov);
   }
-  .ll-seat .ll-fan > * + *,
+  .ll-seat-row .ll-backs > :first-child,
+  .ll-seat-row .ll-fan > :first-child {
+    margin-left: 0;
+  }
   .ll-mine .ll-fan > * + * {
     margin-left: calc(var(--card-w-sm) * -0.55);
   }
@@ -546,6 +562,12 @@ body {
   @media (max-width: 779px) {
     .ll-seat-foot .ll-lbl {
       display: none;
+    }
+    /* Pantallas bajas: con dos filas por asiento, cartas más pequeñas para que quepa la mano. */
+    @media (max-height: 760px) {
+      .ll-seat {
+        --card-w-sm: 26px;
+      }
     }
     .ll-seat {
       padding: 6px 8px;
@@ -1954,28 +1976,6 @@ body {
     }
     .ll-seat.turnof .ll-hd b {
       color: var(--color-gold-light);
-    }
-    .ll-seat-row {
-      --tot: 1;
-      --ov: clamp(
-        calc(var(--card-w-sm) * -0.64),
-        calc((100cqw - var(--tot) * var(--card-w-sm)) / (var(--tot) - 1)),
-        4px
-      );
-      container-type: inline-size;
-      gap: 0;
-    }
-    .ll-seat-row .ll-backs,
-    .ll-seat-row .ll-fan {
-      display: contents;
-    }
-    .ll-seat-row .ll-backs > *,
-    .ll-seat-row .ll-fan > * {
-      margin-left: var(--ov);
-    }
-    .ll-seat-row .ll-backs > :first-child,
-    .ll-seat-row .ll-backs:empty + .ll-fan > :first-child {
-      margin-left: 0;
     }
     .ll-seat-foot .ll-lbl {
       display: none;
