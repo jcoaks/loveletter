@@ -310,8 +310,24 @@ describe('GameScreen: fin de ronda y de partida', () => {
         <GameScreen />
       </MemoryRouter>,
     );
-    expect(screen.getByRole('dialog', { name: /Fin de la ronda/ })).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: /Fin de la ronda/ })).toBeInTheDocument();
   });
+
+  it('el resumen espera a que los bots terminen de comentar el final de la ronda', async () => {
+    const before = rig({ hands: [[1, 2], [3]], bots: 1 });
+    const { act } = mount(before);
+    const after = play(before, 1, 'p1', 3);
+    const chat = [{ id: 1, playerId: 'p1', text: '¡Qué final!', after: null }];
+    rtlAct(() => seed(after, 'p0', { act }, { chat }));
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'Entendido' }));
+    // El comentario sale primero y, mientras se ve, el resumen no está.
+    await screen.findByText('¡Qué final!', {}, { timeout: 3000 });
+    expect(screen.queryByRole('dialog', { name: /Fin de la ronda/ })).toBeNull();
+    // Cuando el globo se va, aparece el resumen.
+    expect(
+      await screen.findByRole('dialog', { name: /Fin de la ronda/ }, { timeout: 15_000 }),
+    ).toBeInTheDocument();
+  }, 25_000);
 
   it('fin de partida: podio, ganador y nueva partida solo para el anfitrión', async () => {
     const before = rig({ hands: [[1, 2], [3]], tokens: [5, 2] });

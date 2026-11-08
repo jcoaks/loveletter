@@ -295,7 +295,23 @@ export function GameScreen() {
   const unread = logOpen ? 0 : Math.max(0, log.length - baseline);
   const seatShown = seatInfo ? [seats.me, ...seats.rivals].find((s) => s.id === seatInfo) : null;
   const chancellorView = game.phase === 'chancellor' ? game.chancellor : null;
-  const showEnd = !current && !endHidden;
+  // El resultado de la ronda espera a que los bots terminen de comentar el final: primero lo que
+  // dicen, luego el resumen; los comentarios de la ronda nueva llegan después de continuar.
+  const speechIdle = !speech.pending && Object.keys(speech.speech).length === 0;
+  const [endGate, setEndGate] = useState(false);
+  useEffect(() => {
+    if (phase !== 'round_over') return setEndGate(false);
+    if (endGate || !speechIdle) return;
+    const timer = window.setTimeout(() => setEndGate(true), 700);
+    return () => window.clearTimeout(timer);
+  }, [phase, speechIdle, endGate]);
+  // Salvavidas: si los globos no terminan (pestaña dormida), el resumen sale igual.
+  useEffect(() => {
+    if (phase !== 'round_over') return;
+    const timer = window.setTimeout(() => setEndGate(true), 25_000);
+    return () => window.clearTimeout(timer);
+  }, [phase]);
+  const showEnd = !current && !endHidden && (phase !== 'round_over' || endGate);
 
   // Only the target of the notice being shown is highlighted, and only while it is open: a mark
   // left over from an earlier play (or round) would read as a status the seat no longer has.
