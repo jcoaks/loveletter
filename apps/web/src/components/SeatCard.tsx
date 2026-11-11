@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from 'react';
+import type { CSSProperties } from 'react';
 import { agree } from '../lib/gender';
 import { type SeatData, seatLabel } from '../lib/seat';
 import { CardBack, CardFan } from './Card';
@@ -106,27 +106,33 @@ export function SeatCard({
   );
 }
 
-/** Franja con los descartes y fichas propios, debajo de la mano. */
+/** Tu propio cuadro: mismo orden que el de los rivales, sin la mano (esa se ve en grande). */
 export function MineBar({
   seat,
   toWin,
   onOpen,
-  children,
 }: {
   seat: SeatData;
   toWin: number;
   onOpen?: () => void;
-  children?: ReactNode;
 }) {
-  const cls = `ll-mine${seat.eliminated ? ' out' : ''}`;
+  const cls = ['ll-mine', seat.eliminated && 'out', seat.isTurn && 'turnof']
+    .filter(Boolean)
+    .join(' ');
   const label = `Tus descartes: ${seat.discards.length ? seat.discards.length : 'ninguno'}. ${seat.tokens} de ${toWin} fichas.${onOpen ? ' Ver detalle' : ''}`;
   const body = (
     <>
-      <span className="ll-lbl">Tus descartes{onOpen ? ' · ver detalle' : ''}</span>
-      <CardFan cards={seat.discards} />
-      <Tokens count={seat.tokens} total={toWin} />
-      <StatusIcons seat={seat} />
-      {children}
+      <span className="ll-hd">
+        <b>Tus descartes</b>
+        <StatusIcons seat={seat} />
+      </span>
+      <span className="ll-seat-row">
+        <CardFan cards={seat.discards} />
+      </span>
+      <span className="ll-seat-foot">
+        <Tokens count={seat.tokens} total={toWin} />
+        <span className="ll-lbl">{onOpen ? 'Ver detalle' : 'Descartes'}</span>
+      </span>
     </>
   );
   return onOpen ? (

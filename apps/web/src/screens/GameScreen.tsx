@@ -478,9 +478,7 @@ export function GameScreen() {
                   lockedValues={lockedValues}
                   hideLast={draws.pending[game.you.id] ?? 0}
                 />
-                <MineBar seat={seats.me} toWin={toWin} onOpen={() => setSeatInfo(game.you.id)}>
-                  {game.isMyTurn && !seats.me.eliminated && <i className="ll-chip on">Tu turno</i>}
-                </MineBar>
+                <MineBar seat={seats.me} toWin={toWin} onOpen={() => setSeatInfo(game.you.id)} />
               </div>
             </>
           }

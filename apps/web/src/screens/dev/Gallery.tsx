@@ -242,9 +242,7 @@ export function Gallery() {
                   </button>
                   <span className="hint">{CARDS[sel]?.text}</span>
                 </div>
-                <MineBar seat={me} toWin={toWin} onOpen={() => setModal('discards')}>
-                  <i className="ll-chip on">Tu turno</i>
-                </MineBar>
+                <MineBar seat={me} toWin={toWin} onOpen={() => setModal('discards')} />
               </>
             }
           />
