@@ -72,7 +72,7 @@ export function SeatCard({
               />
             ))}
         </span>
-        <CardFan cards={seat.discards} />
+        <CardFan cards={seat.discards} hideLast={seat.hiddenDiscards} />
       </span>
       <span className="ll-seat-foot">
         <Tokens count={seat.tokens} total={toWin} />
@@ -127,7 +127,7 @@ export function MineBar({
         <StatusIcons seat={seat} />
       </span>
       <span className="ll-seat-row">
-        <CardFan cards={seat.discards} />
+        <CardFan cards={seat.discards} hideLast={seat.hiddenDiscards} />
       </span>
       <span className="ll-seat-foot">
         <Tokens count={seat.tokens} total={toWin} />

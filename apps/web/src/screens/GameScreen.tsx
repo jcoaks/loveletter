@@ -1,9 +1,10 @@
 import type { CardValue, LegalPlay } from '@loveletter/engine';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { CardFlyer } from '../components/CardFlyer';
 import { ChancellorModal } from '../components/ChancellorModal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { DiscardsModal } from '../components/DiscardsModal';
-import { DrawLayer } from '../components/DrawLayer';
+import { DrawLayer, type Rect } from '../components/DrawLayer';
 import { GameMenu } from '../components/GameMenu';
 import { GuardModal } from '../components/GuessPicker';
 import { GuideModal } from '../components/GuideModal';
@@ -12,7 +13,7 @@ import { BookIcon, MoreIcon, ScrollIcon } from '../components/icons';
 import { LogModal } from '../components/LogModal';
 import { LogoLockup } from '../components/LogoLockup';
 import { PlayerPickerModal } from '../components/PlayerPickerModal';
-import { PlayNoticeModal } from '../components/PlayNoticeModal';
+import { type NoticeView, PlayNoticeModal, seatOrigin } from '../components/PlayNoticeModal';
 import { ResultModal } from '../components/ResultModal';
 import { RulesModal } from '../components/RulesContent';
 import { MineBar } from '../components/SeatCard';
@@ -21,12 +22,13 @@ import { TOAST_MS, ToastStack } from '../components/ToastStack';
 import { TurnBanner } from '../components/TurnBanner';
 import { useCanAct, useGame, useRoom } from '../hooks/room';
 import { useBotSpeech } from '../hooks/useBotSpeech';
+import { prefersReducedMotion } from '../hooks/useCountdown';
 import { useTurnVibration, useWakeLock } from '../hooks/useDevice';
 import { useDraws } from '../hooks/useDraws';
 import { useTableReady } from '../hooks/useTableReady';
 import { effectExtraMs } from '../lib/cardFx';
 import { CARD_BY_VALUE, cardName } from '../lib/cards';
-import { chronicleLines, type TextContext } from '../lib/chronicle';
+import { chronicleLines, groupEvents, type TextContext } from '../lib/chronicle';
 import { buildResults, type ChancellorPick, type TableResult } from '../lib/results';
 import { pickerPlayers, seatsOf } from '../lib/seats';
 import type { NoticeMode } from '../lib/session';
@@ -37,7 +39,39 @@ import { LeaveDialog } from './special/LeaveDialog';
 import { PauseOverlay } from './special/PauseOverlay';
 import { RoundOverModal } from './special/RoundOver';
 
-type Flow = 'picker' | 'guard' | 'confirm' | null;
+/** Solo la confirmación de la Princesa es local: elegir objetivo ya es una jugada declarada (`room.pending`). */
+type Flow = 'confirm' | null;
+
+const rectOf = (el: Element | null | undefined): Rect | null => {
+  if (!el) return null;
+  const r = el.getBoundingClientRect();
+  return r.width > 0 ? { left: r.left, top: r.top, width: r.width, height: r.height } : null;
+};
+
+/** Hueco por defecto donde aterriza una carta cuando no hay aviso que la reciba (centro de la pantalla). */
+const centerRect = (): Rect => ({
+  left: window.innerWidth / 2 - 55,
+  top: window.innerHeight / 2 - 77,
+  width: 110,
+  height: 154,
+});
+
+/**
+ * Una carta que pasa a los descartes de `playerId`. Hasta que llega, su hueco no se ve. `gate` es el
+ * aviso de la jugada: mientras siga abierto la carta se queda en él, y al cerrarse vuela de allí al
+ * montón (sin aviso, sale ya de la mano o del asiento).
+ */
+interface DiscardMove {
+  id: string;
+  playerId: string;
+  card: CardValue;
+  gate: string | null;
+  /** `play`: la carta jugada (viene del aviso o de la mano). `target`: la que descarta el objetivo del Príncipe. */
+  src: 'play' | 'target';
+  /** Quien descarta (para la procedencia si no hay aviso). */
+  actorId: string;
+  launched?: boolean;
+}
 
 /** Todos los avisos de jugadas se cierran solos; cuanto más hay que leer, más tardan. */
 const NOTICE_PUBLIC_MS = 5000;
@@ -65,13 +99,16 @@ function useResults(ctx: TextContext, mode: NoticeMode) {
   const chancellor = useRef<ChancellorPick | null>(null);
   const [queue, setQueue] = useState<TableResult[]>([]);
   const [toasts, setToasts] = useState<TableResult[]>([]);
+  const [moves, setMoves] = useState<DiscardMove[]>([]);
+  // Layout: los descartes nuevos se ocultan antes de pintar, para que no parpadeen antes de volar.
   // biome-ignore lint/correctness/useExhaustiveDependencies: el contexto cambia en cada render; solo importan los sucesos
-  useEffect(() => {
+  useLayoutEffect(() => {
     const lastId = game.events.at(-1)?.id ?? -1;
     if (seen.current === null || lastId < seen.current) {
       seen.current = lastId;
       setQueue([]);
       setToasts([]);
+      setMoves([]);
       return;
     }
     const base = seen.current;
@@ -82,6 +119,40 @@ function useResults(ctx: TextContext, mode: NoticeMode) {
     const isToast = (r: TableResult) =>
       r.style === 'toast' || (r.other !== undefined && mode === 'brief' && !r.other.affectsMe);
     const modals = results.filter((r) => !isToast(r));
+    const gated = new Set(modals.map((r) => r.key));
+    const added: DiscardMove[] = [];
+    for (const group of groupEvents(fresh)) {
+      if (group.kind !== 'play') continue;
+      const key = `ev-${group.play.id}`;
+      // El Canciller no tiene aviso propio al jugarse: la carta espera a que termine de elegirse
+      // (y a que se cierre el aviso final de los demás) antes de volar al descarte.
+      const gate = group.effects.some((e) => e.type === 'chancellor')
+        ? `chancellor:${group.play.playerId}`
+        : gated.has(key)
+          ? key
+          : null;
+      const actorId = group.play.playerId;
+      added.push({
+        id: `${key}-p`,
+        playerId: actorId,
+        card: group.play.card,
+        gate,
+        src: 'play',
+        actorId,
+      });
+      const prince = group.effects.find((e) => e.type === 'prince');
+      if (prince?.type === 'prince') {
+        added.push({
+          id: `${key}-t`,
+          playerId: prince.targetId,
+          card: prince.discarded,
+          gate,
+          src: 'target',
+          actorId,
+        });
+      }
+    }
+    if (added.length) setMoves((m) => [...m, ...added]);
     const light = results.filter(isToast);
     const quick = modals.filter((r) => !r.deferMs);
     if (quick.length) setQueue((q) => [...q, ...quick]);
@@ -94,6 +165,10 @@ function useResults(ctx: TextContext, mode: NoticeMode) {
   return {
     queue,
     toasts,
+    moves,
+    markLaunched: (ids: string[]) =>
+      setMoves((m) => m.map((x) => (ids.includes(x.id) ? { ...x, launched: true } : x))),
+    landMove: (id: string) => setMoves((m) => m.filter((x) => x.id !== id)),
     dismiss: () => setQueue((q) => q.slice(1)),
     dismissToast: (key: string) => setToasts((t) => t.filter((x) => x.key !== key)),
     rememberChancellor: (pick: ChancellorPick) => {
@@ -132,8 +207,20 @@ export function GameScreen() {
 
   const [selected, setSelected] = useState<CardValue | null>(null);
   const [flow, setFlow] = useState<Flow>(null);
-  const [target, setTarget] = useState<string | null>(null);
   const [guess, setGuess] = useState<CardValue | null>(null);
+  // Tu jugada: de dónde salió la carta, si ya voló al centro (declarada) y el vuelo en curso.
+  const origin = useRef<Rect | null>(null);
+  const flown = useRef(false);
+  const lastDeclare = useRef(Number.NEGATIVE_INFINITY);
+  const [myFlight, setMyFlight] = useState<{ card: CardValue; from: Rect; to: Rect } | null>(null);
+  const [pickerReady, setPickerReady] = useState(false);
+  // Aviso de un rival ya mostrado: la ventana se completa en el mismo sitio, sin cerrarse.
+  const [liveShown, setLiveShown] = useState<{
+    key: string;
+    actorId: string;
+    card: CardValue;
+    targetId: string | null;
+  } | null>(null);
   const [chancellorOpen, setChancellorOpen] = useState(true);
   const [seatInfo, setSeatInfo] = useState<string | null>(null);
   const [submittedAt, setSubmittedAt] = useState<number | null>(null);
@@ -151,6 +238,10 @@ export function GameScreen() {
   );
   const results = useResults(ctx, noticeMode);
   const current = results.queue[0];
+  const me = game.you.id;
+  const pending = room.pending;
+  const myPending = pending && pending.playerId === me ? pending : null;
+  const declaredCard = myPending ? (myPending.card as CardValue) : null;
 
   const revealKeys = useMemo(
     () => [...results.queue, ...results.toasts].map((r) => r.key),
@@ -158,6 +249,7 @@ export function GameScreen() {
   );
   const modalOpen =
     Boolean(flow) ||
+    Boolean(myPending) ||
     Boolean(current) ||
     seatInfo !== null ||
     dialog !== null ||
@@ -165,13 +257,85 @@ export function GameScreen() {
     menuOpen;
   const draws = useDraws(game, modalOpen, () => results.pick());
   const baseSeats = useMemo(() => seatsOf(game, room), [game, room]);
+  const heldDiscards = useMemo(() => {
+    const held: Record<string, number> = {};
+    for (const m of results.moves) held[m.playerId] = (held[m.playerId] ?? 0) + 1;
+    return held;
+  }, [results.moves]);
   const seats = useMemo(
     () => ({
-      me: baseSeats.me,
-      rivals: baseSeats.rivals.map((r) => ({ ...r, hiddenBacks: draws.pending[r.id] ?? 0 })),
+      me: { ...baseSeats.me, hiddenDiscards: heldDiscards[baseSeats.me.id] ?? 0 },
+      rivals: baseSeats.rivals.map((r) => ({
+        ...r,
+        hiddenDiscards: heldDiscards[r.id] ?? 0,
+        // La carta declarada ya salió de su mano: su hueco queda vacío mientras decide.
+        hiddenBacks: (draws.pending[r.id] ?? 0) + (pending?.playerId === r.id ? 1 : 0),
+      })),
     }),
-    [baseSeats, draws.pending],
+    [baseSeats, draws.pending, pending?.playerId, heldDiscards],
   );
+  // Descartes: la carta vuela al montón de quien la descarta cuando su aviso se cierra.
+  const noticeRect = useRef<Rect | null>(null);
+  const [discardFlights, setDiscardFlights] = useState<
+    { id: string; card: CardValue; from: Rect; to: Rect; fromBack: boolean; delay: number }[]
+  >([]);
+  const openKeys = useMemo(
+    () => new Set([...results.queue, ...results.toasts].map((r) => r.key)),
+    [results.queue, results.toasts],
+  );
+  // biome-ignore lint/correctness/useExhaustiveDependencies: solo cuando cambian las jugadas por descartar o los avisos abiertos
+  useEffect(() => {
+    const chancellorOpen = (actorId: string) =>
+      [...results.queue, ...results.toasts].some(
+        (r) => r.other?.card === 6 && r.other.actorId === actorId,
+      );
+    const ready = results.moves.filter((m) => {
+      if (m.launched) return false;
+      if (!m.gate) return true;
+      if (m.gate.startsWith('chancellor:'))
+        return game.phase !== 'chancellor' && !chancellorOpen(m.actorId);
+      return !openKeys.has(m.gate);
+    });
+    if (ready.length === 0) return;
+    results.markLaunched(ready.map((m) => m.id));
+    const reduced = prefersReducedMotion();
+    const flights: typeof discardFlights = [];
+    for (const [n, m] of ready.entries()) {
+      const mineSeat = m.playerId === me;
+      const pile = Array.from(
+        document.querySelectorAll(
+          mineSeat ? '.ll-mine .ll-fan > *' : `[data-seat-id="${m.playerId}"] .ll-fan > *`,
+        ),
+      );
+      const all = results.moves.filter((x) => x.playerId === m.playerId);
+      const to = rectOf(pile[pile.length - all.length + all.findIndex((x) => x.id === m.id)]);
+      let from: Rect | null = null;
+      let fromBack = false;
+      if (m.gate?.startsWith('chancellor:') && m.actorId === me) {
+        // Tu Canciller no tiene aviso: la carta salió al centro y de allí vuelve al descarte.
+        from = centerRect();
+      } else if (m.src === 'play' && m.gate && noticeRect.current) {
+        from = noticeRect.current;
+      } else if (m.src === 'play' && m.actorId === me) {
+        from = origin.current;
+      } else if (m.src === 'target' && m.playerId === me) {
+        from = rectOf(document.querySelector('.ll-hand .ll-card'));
+      } else {
+        from = seatOrigin(m.src === 'play' ? m.actorId : m.playerId);
+        fromBack = true;
+      }
+      if (reduced || !from || !to) results.landMove(m.id);
+      else flights.push({ id: m.id, card: m.card, from, to, fromBack, delay: n * 0.25 });
+    }
+    noticeRect.current = null;
+    if (flights.length === 0) return;
+    setDiscardFlights((f) => [...f, ...flights]);
+    // Red de seguridad: si una animación no avisa, la carta se muestra igualmente.
+    for (const f of flights) {
+      window.setTimeout(() => results.landMove(f.id), (f.delay + 0.65 + 0.6) * 1000);
+    }
+  }, [results.moves, openKeys, game.phase]);
+
   const speech = useBotSpeech(room.chat, modalOpen, revealKeys);
   const busy =
     results.queue.length > 0 ||
@@ -214,7 +378,13 @@ export function GameScreen() {
     };
   }, []);
 
-  const hand = game.you.hand;
+  // La carta declarada sale de tu mano (la ven todos en el aviso); queda la otra.
+  const fullHand = game.you.hand;
+  const hand = useMemo(() => {
+    if (declaredCard === null) return fullHand;
+    const i = fullHand.indexOf(declaredCard);
+    return i < 0 ? fullHand : fullHand.filter((_, k) => k !== i);
+  }, [fullHand, declaredCard]);
   const plays = game.legalPlays;
   const lockedValues = useMemo(
     () => new Set(plays.filter((p) => p.blockedBy === 'countess').map((p) => p.card)),
@@ -224,18 +394,33 @@ export function GameScreen() {
   const myPlayTurn = game.isMyTurn && game.phase === 'turn';
   const sel: CardValue | null =
     selected !== null && hand.includes(selected) ? selected : (playableCards[0] ?? hand[0] ?? null);
-  const lp: LegalPlay | undefined = sel === null ? undefined : plays.find((p) => p.card === sel);
+  const lp: LegalPlay | undefined =
+    declaredCard !== null
+      ? plays.find((p) => p.card === declaredCard)
+      : sel === null
+        ? undefined
+        : plays.find((p) => p.card === sel);
 
   // Nueva ronda o nuevo turno: vuelve a mostrar el resumen y reinicia la jugada en curso.
   const phase = game.phase;
   // biome-ignore lint/correctness/useExhaustiveDependencies: solo cuando cambia el turno
   useEffect(() => {
     setFlow(null);
-    setTarget(null);
     setGuess(null);
     setEndHidden(false);
     setChancellorOpen(true);
+    flown.current = false;
   }, [phase, game.activeId, game.round]);
+
+  // Tras declarar, la carta vuela al centro y entonces se abre la elección de objetivo. Si
+  // recargas o reconectas con la jugada ya declarada, se retoma al instante.
+  const hasPending = myPending !== null;
+  useEffect(() => {
+    if (!hasPending) return setPickerReady(false);
+    const wait = flown.current && origin.current && !prefersReducedMotion() ? 600 : 0;
+    const timer = window.setTimeout(() => setPickerReady(true), wait);
+    return () => window.clearTimeout(timer);
+  }, [hasPending]);
 
   function submit(card: CardValue, targetId?: string, guessValue?: CardValue) {
     if (
@@ -248,40 +433,58 @@ export function GameScreen() {
     ) {
       setSubmittedAt(eventCount);
       setFlow(null);
-      setTarget(null);
       setGuess(null);
     }
   }
 
+  /** La carta sale de tu mano: recuerda dónde estaba y, si no habrá aviso que la reciba, vuela al centro. */
+  function leaveHand(card: CardValue, toCenter: boolean) {
+    const el = Array.from(document.querySelectorAll('.ll-hand .ll-card')).find((c) =>
+      c.getAttribute('aria-label')?.startsWith(`${card},`),
+    );
+    origin.current = rectOf(el ?? document.querySelector('.ll-hand .ll-card'));
+    flown.current = toCenter;
+    if (toCenter && origin.current && !prefersReducedMotion()) {
+      setMyFlight({ card, from: origin.current, to: centerRect() });
+    }
+  }
+
   function startPlay() {
-    if (!lp?.playable || !ready) return;
+    if (!lp?.playable || !ready || myPending) return;
     if (lp.card === 9) return setFlow('confirm');
     if (lp.needsTarget) {
-      setTarget(null);
+      // Declarar: desde aquí todos ven la carta y ya no hay vuelta atrás.
+      if (performance.now() - lastDeclare.current < 1500) return;
       setGuess(null);
-      return setFlow(lp.card === 1 ? 'guard' : 'picker');
+      leaveHand(lp.card, true);
+      if (send({ type: 'declare_play', card: lp.card })) lastDeclare.current = performance.now();
+      return;
     }
     // Sin objetivo (carta sin elección u objetivos inexistentes): se juega directo; el aviso
     // "sin efecto" sale del suceso `no_effect`.
+    leaveHand(lp.card, lp.card === 6);
     submit(lp.card);
   }
 
   const nameOf = ctx.name;
   const hint = !lp
     ? ''
-    : takingCard
-      ? 'Tomando carta…'
-      : lp.blockedBy === 'countess'
-        ? `Con la Condesa en la mano no puedes jugar ${cardName(lp.card)}.`
-        : lp.card === 8 && hand.some((c) => c === 5 || c === 7)
-          ? 'Con Rey o Príncipe en la mano debes jugar la Condesa.'
-          : lp.targetRule !== 'none' && !lp.needsTarget
-            ? 'No hay a quién elegir: se descarta sin efecto.'
-            : CARD_BY_VALUE[lp.card].text;
+    : myPending
+      ? 'Elige el objetivo: la carta ya está jugada y no hay vuelta atrás.'
+      : takingCard
+        ? 'Tomando carta…'
+        : lp.blockedBy === 'countess'
+          ? `Con la Condesa en la mano no puedes jugar ${cardName(lp.card)}.`
+          : lp.card === 8 && hand.some((c) => c === 5 || c === 7)
+            ? 'Con Rey o Príncipe en la mano debes jugar la Condesa.'
+            : lp.targetRule !== 'none' && !lp.needsTarget
+              ? 'No hay a quién elegir: se descarta sin efecto.'
+              : CARD_BY_VALUE[lp.card].text;
 
   const text = turnText(game, nameOf);
   const picker = lp ? pickerPlayers(game, seats, lp.targets) : [];
-  const restCard = lp && hand.length === 2 ? hand[hand.indexOf(lp.card) === 0 ? 1 : 0] : undefined;
+  // El Príncipe sobre ti: la carta que descartarías es la otra de tu mano.
+  const restCard = hand.length === 1 ? hand[0] : undefined;
   const log = useMemo(() => chronicleLines(game.events, ctx), [game.events, ctx]);
   const toWin = game.tokensToWin;
   // Con el registro abierto todo cuenta como leído.
@@ -313,11 +516,69 @@ export function GameScreen() {
   }, [phase]);
   const showEnd = !current && !endHidden && (phase !== 'round_over' || endGate);
 
+  // Jugada de otro en curso (declarada o Canciller en espera): su aviso se abre ya, con la carta
+  // sobre la mesa, y se completa en el mismo sitio. En modo breve solo si te toca a ti.
+  const liveCandidate =
+    pending && pending.playerId !== me
+      ? { actorId: pending.playerId, card: pending.card as CardValue, targetId: pending.targetId }
+      : phase === 'chancellor' && game.activeId && game.activeId !== me
+        ? { actorId: game.activeId, card: 6 as CardValue, targetId: null }
+        : null;
+  const liveVisible =
+    !current && liveCandidate !== null && (noticeMode === 'full' || liveCandidate.targetId === me);
+  const liveKey = liveCandidate
+    ? `live-${game.round}-${liveCandidate.actorId}-${liveCandidate.card}-${eventCount}`
+    : null;
+  const continued =
+    current?.other &&
+    liveShown &&
+    liveShown.actorId === current.other.actorId &&
+    liveShown.card === current.other.card
+      ? liveShown
+      : null;
+  let noticeView: NoticeView | null = null;
+  if (current?.other) {
+    noticeView = {
+      key: continued?.key ?? current.key,
+      actorId: current.other.actorId,
+      card: current.other.card,
+      targetId: current.other.targetId,
+      result: current,
+      fly: !continued && !(flown.current && current.other.actorId === me),
+      staged: !continued && !(flown.current && current.other.actorId === me),
+    };
+  } else if (liveVisible && liveCandidate && liveKey) {
+    noticeView = { key: liveKey, ...liveCandidate, result: null, fly: true, staged: false };
+  } else if (liveShown && !current) {
+    // El resultado está a punto de llegar: la ventana no parpadea entre el aviso y el resultado.
+    noticeView = { ...liveShown, result: null, fly: false, staged: false };
+  }
+  // biome-ignore lint/correctness/useExhaustiveDependencies: solo cuando cambia lo que se está mostrando
+  useEffect(() => {
+    if (liveVisible && liveCandidate && liveKey) {
+      setLiveShown((prev) =>
+        prev &&
+        prev.key === liveKey &&
+        prev.targetId === liveCandidate.targetId &&
+        prev.card === liveCandidate.card
+          ? prev
+          : { key: liveKey, ...liveCandidate },
+      );
+      return;
+    }
+    if (current || !liveShown) return;
+    // Nada más que esperar: si el resultado no llega pronto (aviso breve), se retira.
+    const timer = window.setTimeout(() => setLiveShown(null), 1500);
+    return () => window.clearTimeout(timer);
+  }, [liveVisible, liveKey, liveCandidate?.targetId, current, liveShown]);
+
   // Only the target of the notice being shown is highlighted, and only while it is open: a mark
   // left over from an earlier play (or round) would read as a status the seat no longer has.
-  const pickedId = current?.other?.targetId ?? null;
+  const pickedId = noticeView?.targetId ?? null;
   const allMarks: Record<string, 'hit' | 'picked'> =
-    pickedId && pickedId !== game.you.id ? { [pickedId]: current?.hit ? 'hit' : 'picked' } : {};
+    pickedId && pickedId !== game.you.id
+      ? { [pickedId]: current?.hit && noticeView?.result ? 'hit' : 'picked' }
+      : {};
 
   const actions =
     myPlayTurn && lp ? (
@@ -325,7 +586,7 @@ export function GameScreen() {
         <button
           type="button"
           className="ll-play"
-          disabled={!lp.playable || !ready}
+          disabled={!lp.playable || !ready || Boolean(myPending)}
           aria-describedby="act-hint"
           onClick={startPlay}
         >
@@ -508,22 +769,56 @@ export function GameScreen() {
       {logOpen && <LogModal entries={log} onClose={() => setLogOpen(false)} />}
       {dialog === 'rules' && <RulesModal onClose={closeDialog} />}
 
-      {/* Jugada de otro jugador: ventana completa o aviso breve según la preferencia. */}
-      {current?.other && (
+      {/* Jugada de cualquiera: la carta vuela al aviso, que se completa según se decide. */}
+      {noticeView && (
         <PlayNoticeModal
-          notice={current}
-          actorName={current.other.actorId === game.you.id ? 'Tú' : ctx.name(current.other.actorId)}
+          key={noticeView.key}
+          view={noticeView}
+          actorName={noticeView.actorId === me ? 'Tú' : ctx.name(noticeView.actorId)}
           targetName={
-            current.other.targetId
-              ? current.other.targetId === game.you.id
-                ? current.other.actorId === game.you.id
+            noticeView.targetId
+              ? noticeView.targetId === me
+                ? noticeView.actorId === me
                   ? 'Tú mismo'
                   : 'Ti'
-                : ctx.name(current.other.targetId)
+                : ctx.name(noticeView.targetId)
               : null
           }
-          autoCloseMs={noticeMs(current)}
-          onContinue={results.dismiss}
+          mine={noticeView.actorId === me}
+          origin={origin.current}
+          autoCloseMs={current ? noticeMs(current) : NOTICE_PUBLIC_MS}
+          onContinue={() => {
+            noticeRect.current = rectOf(
+              document.querySelector('.ll-sheet .ll-notice-row .ll-card'),
+            );
+            setLiveShown(null);
+            flown.current = false;
+            results.dismiss();
+          }}
+        />
+      )}
+      {discardFlights.map((f) => (
+        <CardFlyer
+          key={f.id}
+          card={f.card}
+          from={f.from}
+          to={f.to}
+          fromBack={f.fromBack}
+          delay={f.delay}
+          onLand={() => {
+            setDiscardFlights((list) => list.filter((x) => x.id !== f.id));
+            results.landMove(f.id);
+          }}
+        />
+      ))}
+      {myFlight && (
+        <CardFlyer
+          card={myFlight.card}
+          from={myFlight.from}
+          to={myFlight.to}
+          fromBack={false}
+          fade
+          onLand={() => setMyFlight(null)}
         />
       )}
 
@@ -543,26 +838,28 @@ export function GameScreen() {
         />
       )}
 
-      {flow === 'picker' && lp && (
+      {pickerReady && myPending && lp && myPending.card !== 1 && (
         <PlayerPickerModal
           card={lp.card}
           players={picker}
           toWin={toWin}
           restCard={lp.card === 5 ? restCard : undefined}
           onPick={(id) => submit(lp.card, id)}
-          onCancel={() => setFlow(null)}
         />
       )}
-      {flow === 'guard' && lp && (
+      {pickerReady && myPending && lp && myPending.card === 1 && (
         <GuardModal
           players={picker}
           toWin={toWin}
-          targetId={target}
+          targetId={myPending.targetId}
           guess={guess}
-          onTarget={setTarget}
+          onTarget={(id) => {
+            if (!myPending.targetId) send({ type: 'declare_target', targetId: id });
+          }}
           onGuess={setGuess}
-          onAccuse={() => target && guess !== null && submit(1, target, guess)}
-          onCancel={() => setFlow(null)}
+          onAccuse={() =>
+            myPending.targetId && guess !== null && submit(1, myPending.targetId, guess)
+          }
         />
       )}
       {flow === 'confirm' && (

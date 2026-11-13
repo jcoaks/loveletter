@@ -25,6 +25,7 @@ import {
   HOST_CAN_END_AFTER_MS,
   NAME_MAX_LENGTH,
   NAME_MIN_LENGTH,
+  type PendingPlay,
   type RoomConfig,
   type RoomErrorCode,
   type RoomInfo,
@@ -64,6 +65,8 @@ export interface RoomData {
   botSeenMoment?: string;
   /** A bot move held until every connected human has seen the table settle (see `planBotMove`). */
   hold?: { moment: string; seats: string[] } | null;
+  /** A committed play still waiting for its target (see `PendingPlay`). */
+  pending?: PendingPlay | null;
   /** Recent bot remarks, oldest first. */
   chat?: ChatLine[];
   nextChatId?: number;
@@ -463,6 +466,7 @@ export function handleMessage(
       );
       if (!created.ok) return error(created.error.code, created.error.message);
       data.game = created.value;
+      data.pending = null;
       data.botNotes = Object.fromEntries(
         data.seats.filter((s) => s.bot).map((s) => [s.id, createBotNotes(ctx.random)]),
       );
@@ -481,13 +485,20 @@ export function handleMessage(
         return error('game_paused', 'La partida está en pausa hasta que vuelvan todos');
       }
       const before = data.game;
+      const mismatch = pendingMismatch(data.pending, seatId, message.action);
+      if (mismatch) return error('already_declared', mismatch);
       const result = applyAction(before, toEngineAction(seatId, message.action), ctx.random);
       if (!result.ok) return error(result.error.code, result.error.message);
       data.game = result.value;
+      data.pending = null;
       botsReact(data, before, ctx);
       updatePause(data, ctx);
       return okResult;
     }
+
+    case 'declare_play':
+    case 'declare_target':
+      return declare(data, seatId, message, where);
 
     case 'leave':
       if (where === 'lobby') {
@@ -520,6 +531,62 @@ export function handleMessage(
   }
 }
 
+/**
+ * Why a `play_card` contradicts what its player already committed to, or null. Once declared, the
+ * card (and the Guard's target) cannot change: the table has seen them.
+ */
+function pendingMismatch(
+  pending: PendingPlay | null | undefined,
+  seatId: string,
+  action: Extract<ClientMessage, { type: 'action' }>['action'],
+): string | null {
+  if (!pending || pending.playerId !== seatId || action.type !== 'play_card') return null;
+  if (action.card !== pending.card)
+    return 'Ya jugaste otra carta: ahora hay que terminar esa jugada';
+  if (pending.targetId && action.targetId !== pending.targetId) {
+    return 'Ya elegiste a quién acusar: no se puede cambiar';
+  }
+  return null;
+}
+
+/** `declare_play` / `declare_target`: commits the card, then the Guard's target, in front of everyone. */
+function declare(
+  data: RoomData,
+  seatId: string,
+  message: Extract<ClientMessage, { type: 'declare_play' | 'declare_target' }>,
+  where: ReturnType<typeof stage>,
+): RoomResult {
+  const game = data.game;
+  if (where !== 'playing' || !game) return error('not_playing', 'No hay partida en curso');
+  if (data.pausedSince !== null) {
+    return error('game_paused', 'La partida está en pausa hasta que vuelvan todos');
+  }
+  if (game.phase !== 'turn' || game.activeId !== seatId) {
+    return error('not_your_turn', 'No es tu turno');
+  }
+  const plays = viewFor(game, seatId).legalPlays;
+  if (message.type === 'declare_play') {
+    if (data.pending) return error('already_declared', 'Ya declaraste una carta');
+    const lp = plays.find((p) => p.card === message.card);
+    if (!lp?.playable) return error('card_not_in_hand', 'No puedes jugar esa carta ahora');
+    if (!lp.needsTarget) return error('invalid_target', 'Esa carta se juega directamente');
+    data.pending = { playerId: seatId, card: message.card, targetId: null };
+    return okResult;
+  }
+  const pending = data.pending;
+  if (!pending || pending.playerId !== seatId) {
+    return error('not_declared', 'Primero declara la carta que juegas');
+  }
+  if (pending.card !== 1) return error('invalid_target', 'Esa carta elige su objetivo al jugarse');
+  if (pending.targetId) return error('already_declared', 'Ya elegiste a quién acusar');
+  const lp = plays.find((p) => p.card === pending.card);
+  if (!lp?.targets.includes(message.targetId)) {
+    return error('invalid_target', 'No puedes elegir a ese jugador');
+  }
+  data.pending = { ...pending, targetId: message.targetId };
+  return okResult;
+}
+
 export function roomView(data: RoomData, seatId: string, ctx: RoomContext): RoomView {
   const status = roomStatus(data);
   const inGame = data.game?.players.some((p) => p.id === seatId) ?? false;
@@ -545,6 +612,7 @@ export function roomView(data: RoomData, seatId: string, ctx: RoomContext): Room
       data.seats.every((s) => isReady(s) && isOnline(data, ctx, s.id)),
     game: data.game && inGame ? viewFor(data.game, seatId) : null,
     chat: [...(data.chat ?? [])],
+    pending: data.pending ? { ...data.pending } : null,
     pause:
       status === 'paused' && data.pausedSince !== null
         ? {
@@ -613,6 +681,7 @@ function removeSeat(data: RoomData, seatId: string, ctx: RoomContext): void {
 
 function backToLobby(data: RoomData, ctx: RoomContext): void {
   data.game = null;
+  data.pending = null;
   data.pausedSince = null;
   data.botNotes = {};
   data.chat = [];

@@ -470,6 +470,82 @@ describe('partida', () => {
   });
 });
 
+describe('jugada declarada', () => {
+  function turn() {
+    const { data, all } = started(3);
+    const active = data.game?.activeId as string;
+    const game = data.game as NonNullable<RoomData['game']>;
+    game.hands[active] = [1, 2];
+    game.protectedIds = [];
+    const rivals = all.filter((id) => id !== active);
+    const send = (id: string, message: ClientMessage) => handleMessage(data, id, message, ctx(all));
+    return { data, all, active, rivals, send };
+  }
+
+  it('todos ven la carta declarada y quien juega no puede cambiarla', () => {
+    const { data, all, active, rivals, send } = turn();
+    expectOk(send(active, { type: 'declare_play', card: 1 }));
+    for (const id of all) {
+      expect(roomView(data, id, ctx(all)).pending).toEqual({
+        playerId: active,
+        card: 1,
+        targetId: null,
+      });
+    }
+    expect(codeOf(send(active, { type: 'declare_play', card: 2 }))).toBe('already_declared');
+    expect(
+      codeOf(
+        send(active, {
+          type: 'action',
+          action: { type: 'play_card', card: 2, targetId: rivals[0] },
+        }),
+      ),
+    ).toBe('already_declared');
+  });
+
+  it('el objetivo del Guardia se anuncia y queda fijo', () => {
+    const { data, all, active, rivals, send } = turn();
+    const [first, second] = rivals as [string, string];
+    expect(codeOf(send(active, { type: 'declare_target', targetId: first }))).toBe('not_declared');
+    expectOk(send(active, { type: 'declare_play', card: 1 }));
+    expect(codeOf(send(active, { type: 'declare_target', targetId: active }))).toBe(
+      'invalid_target',
+    );
+    expectOk(send(active, { type: 'declare_target', targetId: first }));
+    expect(roomView(data, second, ctx(all)).pending?.targetId).toBe(first);
+    expect(codeOf(send(active, { type: 'declare_target', targetId: second }))).toBe(
+      'already_declared',
+    );
+    expect(
+      codeOf(
+        send(active, {
+          type: 'action',
+          action: { type: 'play_card', card: 1, targetId: second, guess: 3 },
+        }),
+      ),
+    ).toBe('already_declared');
+    expectOk(
+      send(active, {
+        type: 'action',
+        action: { type: 'play_card', card: 1, targetId: first, guess: 3 },
+      }),
+    );
+    expect(roomView(data, second, ctx(all)).pending).toBeNull();
+  });
+
+  it('solo declara quien tiene el turno, con una carta que pide objetivo', () => {
+    const { active, rivals, send } = turn();
+    expect(codeOf(send(rivals[0] as string, { type: 'declare_play', card: 1 }))).toBe(
+      'not_your_turn',
+    );
+    expect(codeOf(send(active, { type: 'declare_play', card: 6 }))).toBe('card_not_in_hand');
+    expectOk(send(active, { type: 'declare_play', card: 2 }));
+    expect(codeOf(send(active, { type: 'declare_target', targetId: rivals[0] as string }))).toBe(
+      'invalid_target',
+    );
+  });
+});
+
 describe('bots', () => {
   it('cuentan como listos y conectados para empezar, y nunca pausan la partida', () => {
     const { data } = started(1, 3);

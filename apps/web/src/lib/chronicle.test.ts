@@ -233,17 +233,30 @@ describe('avisos de jugadas ajenas', () => {
     expect(notices(onMe, 'p2')[0]?.secretFaces).toEqual([]);
   });
 
-  it('Doncella, Espía y Canciller no tienen objetivo', () => {
+  it('Doncella y Espía no tienen objetivo', () => {
     for (const [card, text] of [
       [4, 'queda protegido'],
       [0, 'jugó el Espía.'],
-      [6, 'robó 2 cartas'],
     ] as const) {
       const s = play(rig({ hands: [[card, 2], [3], [4]] }), card);
       const [n] = notices(s, 'p2');
       expect(n?.body).toContain(text);
       expect(n?.other).toMatchObject({ targetId: null, affectsMe: false });
     }
+  });
+
+  it('el Canciller ajeno avisa al terminar de elegir, no al jugarse', () => {
+    const played = play(rig({ hands: [[6, 2], [3], [4]], deck: [7, 8, 1, 1] }), 6);
+    expect(notices(played, 'p2')).toEqual([]);
+    const done = step(played, {
+      type: 'chancellor_keep',
+      playerId: 'p0',
+      keep: 2,
+      bottomOrder: [7, 8],
+    } as never);
+    const [n] = notices(done, 'p2');
+    expect(n?.body).toBe('Ana conservó una carta y dejó 2 cartas al fondo del mazo.');
+    expect(n?.other).toMatchObject({ actorId: 'p0', card: 6, targetId: null, affectsMe: false });
   });
 
   it('Rey y Sacerdote como objetivo; un tercero no ve nada secreto', () => {

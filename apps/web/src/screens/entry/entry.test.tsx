@@ -203,6 +203,7 @@ describe('Sala de espera', () => {
     canStart: false,
     game: null,
     chat: [],
+    pending: null,
     pause: null,
     ...over,
   });
@@ -434,6 +435,7 @@ describe('Sello de listo en la sala de espera', () => {
     canStart: false,
     game: null,
     chat: [],
+    pending: null,
     pause: null,
   });
   const show = (players: ReturnType<typeof seat>[]) => {

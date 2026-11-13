@@ -1631,6 +1631,10 @@ body {
     overflow: hidden;
   }
   /* Capa recortada por la pila del mazo: lo que cae dentro queda tapado (entra por debajo). */
+  /* Vuelo de una carta jugada: por encima de las ventanas. */
+  .ll-flights.top {
+    z-index: calc(var(--z-modal) + 5);
+  }
   .ll-flight-clip {
     position: fixed;
     inset: 0;

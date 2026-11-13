@@ -30,6 +30,24 @@ const play = (state: GameState, card: CardValue, targetId?: string, guess?: Card
 
 const dialog = () => screen.getByRole('dialog');
 
+/** Pulsa "Jugar" de una carta con objetivo: se declara y, cuando la sala lo confirma, se abre la elección. */
+async function declare(
+  user: ReturnType<typeof userEvent.setup>,
+  name: string,
+  card: CardValue,
+  send: ReturnType<typeof vi.fn>,
+  targetId: string | null = null,
+) {
+  await user.click(screen.getByRole('button', { name }));
+  expect(send).toHaveBeenCalledWith({ type: 'declare_play', card });
+  rtlAct(() =>
+    useRoomStore.setState((s) => ({
+      room: s.room && { ...s.room, pending: { playerId: 'p0', card, targetId } },
+    })),
+  );
+  await screen.findByRole('dialog');
+}
+
 describe('GameScreen: mesa', () => {
   it('muestra tu mano, el turno y a los rivales solo con reversos', () => {
     const state = rig({ hands: [[1, 5], [3], [9]] });
@@ -81,21 +99,35 @@ describe('GameScreen: mesa', () => {
 
 describe('GameScreen: jugadas', () => {
   it('Guardia: jugador y carta en una ventana', async () => {
-    const { user, act } = mount(rig({ hands: [[1, 2], [3], [4]] }));
-    await user.click(screen.getByRole('button', { name: 'Jugar Guardia' }));
+    const { user, act, send } = mount(rig({ hands: [[1, 2], [3], [4]] }));
+    await declare(user, 'Jugar Guardia', 1, send);
     const d = within(dialog());
     const accuse = d.getByRole('button', { name: 'Acusar' });
     expect(accuse).toBeDisabled();
+    // Ya no hay vuelta atrás: ni Cancelar ni cerrar.
+    expect(d.queryByRole('button', { name: 'Cancelar' })).toBeNull();
+    expect(d.queryByRole('button', { name: 'Cerrar' })).toBeNull();
     await user.click(d.getByRole('button', { name: /Beto/ }));
+    expect(send).toHaveBeenCalledWith({ type: 'declare_target', targetId: 'p1' });
+    rtlAct(() =>
+      useRoomStore.setState((s) => ({
+        room: s.room && { ...s.room, pending: { playerId: 'p0', card: 1, targetId: 'p1' } },
+      })),
+    );
+    // El objetivo anunciado queda fijo.
+    expect(within(dialog()).getByRole('button', { name: /Carla/ })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
     await user.click(d.getByRole('button', { name: /^3\s*Barón/ }));
     await user.click(d.getByRole('button', { name: 'Acusar a Beto: Barón' }));
     expect(act).toHaveBeenCalledWith({ type: 'play_card', card: 1, targetId: 'p1', guess: 3 });
   });
 
   it('Sacerdote, Barón y Rey eligen jugador y envían al instante; los protegidos no se pueden elegir', async () => {
-    const { user, act } = mount(rig({ hands: [[2, 7], [3], [4]], protect: [2] }));
+    const { user, act, send } = mount(rig({ hands: [[2, 7], [3], [4]], protect: [2] }));
     await user.click(screen.getByRole('button', { name: /^2, Sacerdote/ }));
-    await user.click(screen.getByRole('button', { name: 'Jugar Sacerdote' }));
+    await declare(user, 'Jugar Sacerdote', 2, send);
     const d = within(dialog());
     expect(d.getByRole('button', { name: /Carla/ })).toHaveAttribute('aria-disabled', 'true');
     await user.click(d.getByRole('button', { name: /Beto/ }));
@@ -108,9 +140,11 @@ describe('GameScreen: jugadas', () => {
     [3, 'Barón', 'Jugar Barón'],
     [7, 'Rey', 'Jugar Rey'],
   ])('%i %s: tu cuadro aparece deshabilitado con tus descartes', async (card, _name, play) => {
-    const { user, act } = mount(rig({ hands: [[card, 9], [3], [4]], discards: { 0: [1, 1, 5] } }));
+    const { user, act, send } = mount(
+      rig({ hands: [[card, 9], [3], [4]], discards: { 0: [1, 1, 5] } }),
+    );
     await user.click(screen.getByRole('button', { name: new RegExp(`^${card}, `) }));
-    await user.click(screen.getByRole('button', { name: play }));
+    await declare(user, play, card, send);
     const d = within(dialog());
     const me = d.getByRole('button', { name: /Ana \(tú\)/ });
     expect(me).toHaveAttribute('aria-disabled', 'true');
@@ -131,9 +165,9 @@ describe('GameScreen: jugadas', () => {
   });
 
   it('sin descartes, tu cuadro dice "Sin descartes"', async () => {
-    const { user } = mount(rig({ hands: [[2, 7], [3], [4]] }));
+    const { user, send } = mount(rig({ hands: [[2, 7], [3], [4]] }));
     await user.click(screen.getByRole('button', { name: /^2, Sacerdote/ }));
-    await user.click(screen.getByRole('button', { name: 'Jugar Sacerdote' }));
+    await declare(user, 'Jugar Sacerdote', 2, send);
     expect(
       within(within(dialog()).getByRole('button', { name: /Ana \(tú\)/ })).getByText(
         'Sin descartes',
@@ -142,8 +176,8 @@ describe('GameScreen: jugadas', () => {
   });
 
   it('Príncipe: puedes elegirte y se muestra qué descartarías', async () => {
-    const { user, act } = mount(rig({ hands: [[5, 2], [3], [4]] }));
-    await user.click(screen.getByRole('button', { name: 'Jugar Príncipe' }));
+    const { user, act, send } = mount(rig({ hands: [[5, 2], [3], [4]] }));
+    await declare(user, 'Jugar Príncipe', 5, send);
     const d = within(dialog());
     expect(d.getByText('Descartas Sacerdote y robas')).toBeInTheDocument();
     // Con el Príncipe sí puedes elegirte: sigue habilitado.
@@ -589,9 +623,11 @@ describe('GameScreen: avisos de jugadas ajenas', () => {
 
 describe('GameScreen: elegir jugador y logo', () => {
   it('título corto, instrucción como subtítulo y descartes contados dentro de la tarjeta', async () => {
-    const { user } = mount(rig({ hands: [[3, 2], [5], [4]], discards: { 1: [1, 1, 1, 1, 5, 5] } }));
+    const { user, send } = mount(
+      rig({ hands: [[3, 2], [5], [4]], discards: { 1: [1, 1, 1, 1, 5, 5] } }),
+    );
     await user.click(screen.getByRole('button', { name: /^3, Barón/ }));
-    await user.click(screen.getByRole('button', { name: 'Jugar Barón' }));
+    await declare(user, 'Jugar Barón', 3, send);
     const d = within(dialog());
     expect(d.getByRole('heading', { name: 'Barón' })).toBeInTheDocument();
     expect(d.getByText(/^Elige con quién comparar manos\. Protegidos/)).toBeInTheDocument();
@@ -844,7 +880,8 @@ describe('GameScreen: "qué hace" la carta en el aviso', () => {
 
   it('Canciller y Princesa también la llevan', async () => {
     for (const [card, rx] of [
-      [6, /Roba 2 cartas, conserva 1/],
+      // El Canciller espera a que Ana elija: el aviso se completa al terminar.
+      [6, /Ana roba, elige una carta y deja el resto al fondo del mazo/],
       [9, /Quien la descarta queda fuera/],
     ] as const) {
       const before = rig({ hands: [[card, 2], [3], [5]] });
@@ -893,5 +930,62 @@ describe('GameScreen: "qué hace" la carta en el aviso', () => {
       log2.getByText('Ana jugó la Doncella: queda protegido hasta su próximo turno.'),
     ).toBeInTheDocument();
     expect(log2.queryByText(/Nadie puede elegirlo/)).toBeNull();
+  });
+});
+
+describe('GameScreen: jugada declarada por otro', () => {
+  const asPending = (card: CardValue, targetId: string | null) =>
+    rtlAct(() =>
+      useRoomStore.setState((st) => ({
+        room: st.room && { ...st.room, pending: { playerId: 'p0', card, targetId } },
+      })),
+    );
+
+  it('el Guardia se ve antes de elegir objetivo, luego el objetivo y el resultado en la misma ventana', async () => {
+    useUiStore.setState({ noticeMode: 'full' });
+    const before = rig({ hands: [[1, 2], [3], [4]] });
+    const fns = { act: vi.fn(() => true), send: vi.fn(() => true) };
+    seed(before, 'p2', fns);
+    render(
+      <MemoryRouter>
+        <GameScreen />
+      </MemoryRouter>,
+    );
+    asPending(1, null);
+    let d = within(await screen.findByRole('dialog', { name: /^Jugada de Ana: Guardia/ }));
+    expect(d.getByText('Ana elige a quién acusar…')).toBeInTheDocument();
+    expect(d.queryByRole('button', { name: 'Entendido' })).toBeNull();
+    expect(d.queryByRole('button', { name: 'Cerrar' })).toBeNull();
+    const sheet = dialog();
+    asPending(1, 'p1');
+    d = within(dialog());
+    expect(d.getByText('Beto')).toBeInTheDocument();
+    expect(d.getByText(/Ana acusa a Beto y elige la carta/)).toBeInTheDocument();
+    // El resultado completa la misma ventana: no se cierra ni se reabre.
+    rtlAct(() => {
+      seed(play(before, 1, 'p1', 5), 'p2', fns);
+    });
+    d = within(await screen.findByRole('dialog', { name: /^Jugada de Ana: Guardia/ }));
+    expect(
+      d.getByText('Ana jugó el Guardia contra Beto y nombró el Príncipe: falló.'),
+    ).toBeInTheDocument();
+    expect(dialog()).toBe(sheet);
+  });
+
+  it('en modo breve solo se abre si el objetivo eres tú', async () => {
+    useUiStore.setState({ noticeMode: 'brief' });
+    const before = rig({ hands: [[1, 2], [3], [4]] });
+    seed(before, 'p1', { act: vi.fn(() => true), send: vi.fn(() => true) });
+    render(
+      <MemoryRouter>
+        <GameScreen />
+      </MemoryRouter>,
+    );
+    asPending(1, null);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    asPending(1, 'p1');
+    expect(
+      await screen.findByRole('dialog', { name: /^Jugada de Ana: Guardia/ }),
+    ).toBeInTheDocument();
   });
 });

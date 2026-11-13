@@ -362,9 +362,18 @@ export function Gallery() {
       )}
       {modal === 'own-spy' && ownSpy() && (
         <PlayNoticeModal
-          notice={ownSpy() as TableResult}
+          view={{
+            key: 'gallery-spy',
+            actorId: 'me',
+            card: 0,
+            targetId: null,
+            result: ownSpy() as TableResult,
+            fly: false,
+            staged: false,
+          }}
           actorName="Tú"
           targetName={null}
+          mine
           autoCloseMs={5000}
           onContinue={close}
         />

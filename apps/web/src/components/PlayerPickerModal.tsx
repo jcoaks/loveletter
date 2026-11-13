@@ -45,6 +45,7 @@ export function PlayerPickerModal({
   selectedId,
   onPick,
   onCancel,
+  locked = false,
   restCard,
   children,
   footer,
@@ -54,7 +55,10 @@ export function PlayerPickerModal({
   toWin: number;
   selectedId?: string | null;
   onPick: (id: string) => void;
-  onCancel: () => void;
+  /** Sin `onCancel` la jugada ya está declarada: no hay vuelta atrás (ni botón, ni Escape). */
+  onCancel?: () => void;
+  /** El objetivo ya se anunció: no se puede cambiar. */
+  locked?: boolean;
   /** La otra carta de tu mano: se muestra al elegirte con el Príncipe. */
   restCard?: CardValue;
   children?: ReactNode;
@@ -71,9 +75,11 @@ export function PlayerPickerModal({
       onClose={onCancel}
       footer={
         <>
-          <button type="button" className="ll-ghost" onClick={onCancel}>
-            Cancelar
-          </button>
+          {onCancel && (
+            <button type="button" className="ll-ghost" onClick={onCancel}>
+              Cancelar
+            </button>
+          )}
           {footer}
         </>
       }
@@ -106,13 +112,15 @@ export function PlayerPickerModal({
               <Tokens count={p.tokens} total={toWin} />
             </>
           );
+          const frozen = locked && selectedId !== p.id;
           return p.eligible && (prince || !p.isMe) ? (
             <button
               key={p.id}
               type="button"
-              className={`ll-ptile${p.isMe ? ' me' : ''}`}
+              className={`ll-ptile${p.isMe ? ' me' : ''}${frozen ? ' off' : ''}`}
               aria-pressed={selectable ? selectedId === p.id : undefined}
-              onClick={() => onPick(p.id)}
+              aria-disabled={locked || undefined}
+              onClick={locked ? undefined : () => onPick(p.id)}
             >
               {inner}
             </button>

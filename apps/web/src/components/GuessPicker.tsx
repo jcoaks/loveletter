@@ -49,7 +49,8 @@ export function GuardModal({
   onTarget: (id: string) => void;
   onGuess: (v: CardValue) => void;
   onAccuse: () => void;
-  onCancel: () => void;
+  /** Sin esto la jugada ya está declarada y no hay vuelta atrás. */
+  onCancel?: () => void;
 }) {
   const target = players.find((p) => p.id === targetId);
   const ready = Boolean(target) && guess !== null;
@@ -59,6 +60,7 @@ export function GuardModal({
       players={players}
       toWin={toWin}
       selectedId={targetId}
+      locked={targetId !== null}
       onPick={onTarget}
       onCancel={onCancel}
       footer={
@@ -70,7 +72,9 @@ export function GuardModal({
       }
     >
       <span className="ll-lbl">
-        {target ? `¿Qué carta crees que tiene ${target.name}?` : 'Primero elige un jugador'}
+        {target
+          ? `Acusas a ${target.name}: ¿qué carta crees que tiene?`
+          : 'Primero elige un jugador: todos verán a quién acusas'}
       </span>
       <GuessPicker selected={guess} onSelect={onGuess} disabled={!target} />
       <span className="ll-lbl">No puedes nombrar Guardia. Si fallas, nadie ve su carta.</span>

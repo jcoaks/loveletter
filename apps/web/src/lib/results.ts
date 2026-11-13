@@ -138,12 +138,28 @@ export function buildResults(
   const results: TableResult[] = [];
   for (const group of groupEvents(events)) {
     if (group.kind === 'play') {
-      // Tu Canciller abre su propia elección: no hace falta avisar de la jugada.
-      if (group.play.playerId === ctx.me && find(group.effects, 'chancellor')) continue;
+      // El Canciller abre su propia elección: el aviso de los demás espera (con la carta ya en
+      // la mesa) a que `chancellor_done` lo complete, y el tuyo es la ventana de elegir.
+      if (find(group.effects, 'chancellor')) continue;
       results.push(playNotice(group, ctx));
       continue;
     }
     const e = group.event;
+    if (e.type === 'chancellor_done' && e.playerId !== ctx.me) {
+      const who = ctx.name(e.playerId);
+      results.push({
+        key: `ev-${e.id}`,
+        style: 'modal',
+        label: `Jugada de ${who}: Canciller`,
+        title: `${who} jugó el Canciller`,
+        body: `${who} conservó una carta y dejó ${e.returned === 1 ? '1 carta' : `${e.returned} cartas`} al fondo del mazo.`,
+        effect: effectLine(6, false),
+        faces: [],
+        visibility: 'public',
+        hit: false,
+        other: { actorId: e.playerId, card: 6, targetId: null, affectsMe: false },
+      });
+    }
     if (e.type === 'chancellor_done' && e.playerId === ctx.me) {
       const faces: ResultFace[] = chancellor
         ? [

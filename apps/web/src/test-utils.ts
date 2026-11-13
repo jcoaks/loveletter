@@ -90,6 +90,7 @@ export function roomFor(
     canStart: false,
     game: viewFor(state, viewerId),
     chat: [],
+    pending: null,
     pause: null,
     ...extra,
   };

@@ -121,9 +121,12 @@ export function CardFan({
   cards,
   className = '',
   wrap = false,
+  hideLast = 0,
 }: {
   cards: readonly CardValue[];
   className?: string;
+  /** Las últimas N cartas aún vuelan hacia aquí: su hueco queda reservado pero invisible. */
+  hideLast?: number;
   /** En varias líneas y sin solape: nunca se sale de su contenedor. */
   wrap?: boolean;
 }) {
@@ -133,8 +136,13 @@ export function CardFan({
       style={{ '--tot': Math.max(1, cards.length) } as CSSProperties}
     >
       {cards.map((v, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: los descartes son una lista ordenada que solo crece
-        <Card key={`${i}-${v}`} value={v} size="sm" />
+        <Card
+          // biome-ignore lint/suspicious/noArrayIndexKey: los descartes son una lista ordenada que solo crece
+          key={`${i}-${v}`}
+          value={v}
+          size="sm"
+          className={i >= cards.length - hideLast ? 'll-pending' : ''}
+        />
       ))}
     </span>
   );

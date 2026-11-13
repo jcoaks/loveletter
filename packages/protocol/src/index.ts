@@ -88,6 +88,8 @@ export type RoomErrorCode =
   | 'not_everyone_ready'
   | 'invalid_config'
   | 'game_paused'
+  | 'already_declared'
+  | 'not_declared'
   | 'not_paused_long_enough'
   | 'room_not_found'
   | 'room_exists';
@@ -126,6 +128,16 @@ export interface ChatLine {
   final?: boolean;
 }
 
+/**
+ * A play that is committed but not finished: the card is out of the hand and the table sees it
+ * while the player still has to choose (`targetId` null until the Guard's accusation is aimed).
+ */
+export interface PendingPlay {
+  playerId: string;
+  card: number;
+  targetId: string | null;
+}
+
 export interface RoomView {
   code: string;
   status: RoomStatus;
@@ -141,6 +153,8 @@ export interface RoomView {
   game: PlayerView | null;
   /** The latest bot remarks, oldest first. */
   chat: ChatLine[];
+  /** The play in progress (declared, not yet applied), or null. */
+  pending: PendingPlay | null;
   /** Set exactly when `status === 'paused'`. Timestamps are epoch milliseconds. */
   pause: { disconnectedIds: string[]; since: number; hostCanEndAt: number } | null;
 }

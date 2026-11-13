@@ -57,6 +57,10 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('kick'), playerId }),
   z.strictObject({ type: z.literal('start') }),
   z.strictObject({ type: z.literal('action'), action: gameActionSchema }),
+  /** Commit the card you are about to play (one that asks for a target) before choosing the target. */
+  z.strictObject({ type: z.literal('declare_play'), card: cardValue }),
+  /** Guard only: tell the table whom you accuse before naming the card. */
+  z.strictObject({ type: z.literal('declare_target'), targetId: playerId }),
   /** This screen has shown everything about `moment` (reveals, remarks): bots may move. */
   z.strictObject({ type: z.literal('table_ready'), moment: z.string().min(1).max(64) }),
   z.strictObject({ type: z.literal('leave') }),

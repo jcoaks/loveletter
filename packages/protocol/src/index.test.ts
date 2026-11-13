@@ -69,6 +69,8 @@ describe('mensajes del cliente', () => {
       { type: 'kick', playerId: 'p1' },
       { type: 'start' },
       { type: 'table_ready', moment: 'ev-12' },
+      { type: 'declare_play', card: 1 },
+      { type: 'declare_target', targetId: 'p1' },
       { type: 'leave' },
       { type: 'end_game' },
       { type: 'new_game' },
