@@ -23,6 +23,8 @@ export interface SeatData {
   hiddenBacks?: number;
   /** Últimos descartes que aún vuelan desde la mano o el aviso: su hueco no se ve todavía. */
   hiddenDiscards?: number;
+  /** Doncella recién jugada: `wait` (la carta aún no llega al descarte) o `fx` (animación del escudo); en ambos el icono de protegido aún no se ve. */
+  shield?: 'wait' | 'fx';
 }
 
 export interface SeatChip {

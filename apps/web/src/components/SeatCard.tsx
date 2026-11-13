@@ -11,7 +11,9 @@ import { Tokens } from './Token';
 export function StatusIcons({ seat }: { seat: SeatData }) {
   const items: { kind: 'out' | 'prot' | 'spy' | 'off'; label: string }[] = [];
   if (seat.eliminated) items.push({ kind: 'out', label: agree('Eliminado', seat.gender) });
-  if (seat.protected) items.push({ kind: 'prot', label: agree('Protegido', seat.gender) });
+  if (seat.protected && !seat.shield) {
+    items.push({ kind: 'prot', label: agree('Protegido', seat.gender) });
+  }
   if (seat.spyPlayed) items.push({ kind: 'spy', label: 'Espía jugado' });
   if (seat.connected === false)
     items.push({ kind: 'off', label: agree('Desconectado', seat.gender) });
@@ -32,6 +34,17 @@ export function StatusIcons({ seat }: { seat: SeatData }) {
 
 export type SeatMark = 'hit' | 'miss' | 'picked';
 
+/** Escudo que aparece sobre el cuadro al jugarse la Doncella y luego se recoge hacia el icono de estado. */
+export function ShieldFx({ seat }: { seat: SeatData }) {
+  if (seat.shield !== 'fx') return null;
+  return (
+    <span className="ll-shield-fx" aria-hidden="true">
+      <i className="ring" />
+      <i className="shield" />
+    </span>
+  );
+}
+
 /** Asiento de un rival: nombre, estados, reverso de su mano, descartes y fichas. */
 export function SeatCard({
   seat,
@@ -48,11 +61,19 @@ export function SeatCard({
   /** Abre el detalle de descartes. Sin esto, el asiento no es interactivo. */
   onOpen?: () => void;
 }) {
-  const cls = ['ll-seat', position, seat.eliminated && 'out', seat.isTurn && 'turnof', mark]
+  const cls = [
+    'll-seat',
+    position,
+    seat.eliminated && 'out',
+    seat.isTurn && 'turnof',
+    seat.shield === 'fx' && 'shielding',
+    mark,
+  ]
     .filter(Boolean)
     .join(' ');
   const body = (
     <>
+      <ShieldFx seat={seat} />
       <span className="ll-hd">
         <b>{seat.name}</b>
         {seat.bot && <i className="ll-chip bot">Bot</i>}
@@ -116,12 +137,18 @@ export function MineBar({
   toWin: number;
   onOpen?: () => void;
 }) {
-  const cls = ['ll-mine', seat.eliminated && 'out', seat.isTurn && 'turnof']
+  const cls = [
+    'll-mine',
+    seat.eliminated && 'out',
+    seat.isTurn && 'turnof',
+    seat.shield === 'fx' && 'shielding',
+  ]
     .filter(Boolean)
     .join(' ');
   const label = `Tus descartes: ${seat.discards.length ? seat.discards.length : 'ninguno'}. ${seat.tokens} de ${toWin} fichas.${onOpen ? ' Ver detalle' : ''}`;
   const body = (
     <>
+      <ShieldFx seat={seat} />
       <span className="ll-hd">
         <b>Tus descartes</b>
         <StatusIcons seat={seat} />

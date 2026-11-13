@@ -70,6 +70,8 @@ interface DiscardMove {
   src: 'play' | 'target';
   /** Quien descarta (para la procedencia si no hay aviso). */
   actorId: string;
+  /** Doncella: al llegar la carta al descarte se anima el escudo del jugador. */
+  shield?: boolean;
   launched?: boolean;
 }
 
@@ -100,6 +102,11 @@ function useResults(ctx: TextContext, mode: NoticeMode) {
   const [queue, setQueue] = useState<TableResult[]>([]);
   const [toasts, setToasts] = useState<TableResult[]>([]);
   const [moves, setMoves] = useState<DiscardMove[]>([]);
+  const movesRef = useRef<DiscardMove[]>([]);
+  movesRef.current = moves;
+  // Doncella: `wait` hasta que su carta cae en el descarte, `fx` mientras dura la animación del escudo.
+  const [shields, setShields] = useState<Record<string, 'wait' | 'fx'>>({});
+  const shieldTimers = useRef(new Set<string>());
   // Layout: los descartes nuevos se ocultan antes de pintar, para que no parpadeen antes de volar.
   // biome-ignore lint/correctness/useExhaustiveDependencies: el contexto cambia en cada render; solo importan los sucesos
   useLayoutEffect(() => {
@@ -109,6 +116,7 @@ function useResults(ctx: TextContext, mode: NoticeMode) {
       setQueue([]);
       setToasts([]);
       setMoves([]);
+      setShields({});
       return;
     }
     const base = seen.current;
@@ -139,7 +147,9 @@ function useResults(ctx: TextContext, mode: NoticeMode) {
         gate,
         src: 'play',
         actorId,
+        ...(group.play.card === 4 ? { shield: true } : {}),
       });
+      if (group.play.card === 4) setShields((sh) => ({ ...sh, [actorId]: 'wait' }));
       const prince = group.effects.find((e) => e.type === 'prince');
       if (prince?.type === 'prince') {
         added.push({
@@ -173,13 +183,43 @@ function useResults(ctx: TextContext, mode: NoticeMode) {
     }
     if (light.length) setToasts((t) => [...t, ...light]);
   }, [game.events]);
+  // El escudo se anima 1,5 s y entonces queda como icono de estado.
+  useEffect(() => {
+    for (const [pid, st] of Object.entries(shields)) {
+      if (st !== 'fx' || shieldTimers.current.has(pid)) continue;
+      shieldTimers.current.add(pid);
+      window.setTimeout(() => {
+        shieldTimers.current.delete(pid);
+        setShields((sh) => {
+          const { [pid]: _gone, ...rest } = sh;
+          return rest;
+        });
+      }, 1500);
+    }
+  }, [shields]);
   return {
     queue,
     toasts,
     moves,
     markLaunched: (ids: string[]) =>
       setMoves((m) => m.map((x) => (ids.includes(x.id) ? { ...x, launched: true } : x))),
-    landMove: (id: string) => setMoves((m) => m.filter((x) => x.id !== id)),
+    shields,
+    landMove: (id: string) => {
+      const mv = movesRef.current.find((x) => x.id === id);
+      if (mv?.shield) {
+        const pid = mv.playerId;
+        const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+        setShields((sh) => {
+          if (sh[pid] !== 'wait') return sh;
+          if (reduced) {
+            const { [pid]: _gone, ...rest } = sh;
+            return rest;
+          }
+          return { ...sh, [pid]: 'fx' };
+        });
+      }
+      setMoves((m) => m.filter((x) => x.id !== id));
+    },
     dismiss: () => setQueue((q) => q.slice(1)),
     dismissToast: (key: string) => setToasts((t) => t.filter((x) => x.key !== key)),
     rememberChancellor: (pick: ChancellorPick) => {
@@ -275,15 +315,20 @@ export function GameScreen() {
   }, [results.moves]);
   const seats = useMemo(
     () => ({
-      me: { ...baseSeats.me, hiddenDiscards: heldDiscards[baseSeats.me.id] ?? 0 },
+      me: {
+        ...baseSeats.me,
+        hiddenDiscards: heldDiscards[baseSeats.me.id] ?? 0,
+        shield: results.shields[baseSeats.me.id],
+      },
       rivals: baseSeats.rivals.map((r) => ({
         ...r,
         hiddenDiscards: heldDiscards[r.id] ?? 0,
+        shield: results.shields[r.id],
         // La carta declarada ya salió de su mano: su hueco queda vacío mientras decide.
         hiddenBacks: (draws.pending[r.id] ?? 0) + (pending?.playerId === r.id ? 1 : 0),
       })),
     }),
-    [baseSeats, draws.pending, pending?.playerId, heldDiscards],
+    [baseSeats, draws.pending, pending?.playerId, heldDiscards, results.shields],
   );
   // Descartes: la carta vuela al montón de quien la descarta cuando su aviso se cierra.
   const noticeRect = useRef<Rect | null>(null);
