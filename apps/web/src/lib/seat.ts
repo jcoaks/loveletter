@@ -25,6 +25,8 @@ export interface SeatData {
   hiddenDiscards?: number;
   /** Doncella recién jugada: `wait` (la carta aún no llega al descarte) o `fx` (animación del escudo); en ambos el icono de protegido aún no se ve. */
   shield?: 'wait' | 'fx';
+  /** Lo mismo para el Espía (el ojo): se oculta el icono hasta que termina la animación. */
+  eye?: 'wait' | 'fx';
 }
 
 export interface SeatChip {

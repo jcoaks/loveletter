@@ -700,6 +700,17 @@ body {
     filter: drop-shadow(0 0 10px rgb(240 210 130 / 0.85));
     animation: ll-shield-in 1.5s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
+  .ll-shield-fx .eye {
+    grid-area: 1 / 1;
+    width: 72px;
+    height: 72px;
+    background: linear-gradient(160deg, var(--color-gold-light), var(--color-gold) 60%, #8a6a2c);
+    -webkit-mask: var(--eye) center / contain no-repeat;
+    mask: var(--eye) center / contain no-repeat;
+    --eye: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z'/%3E%3Ccircle cx='12' cy='12' r='3.4' fill='black'/%3E%3C/svg%3E");
+    filter: drop-shadow(0 0 10px rgb(240 210 130 / 0.85));
+    animation: ll-eye-in 1.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
   .ll-shield-fx .ring {
     grid-area: 1 / 1;
     width: 64px;
@@ -712,7 +723,8 @@ body {
   .ll-mine.shielding {
     animation: ll-shield-glow 1.5s ease-out;
   }
-  .ll-ico.prot {
+  .ll-ico.prot,
+  .ll-ico.spy {
     animation: ll-ico-pop 0.35s ease-out;
   }
   @keyframes ll-shield-in {
@@ -729,6 +741,31 @@ body {
     }
     72% {
       transform: scale(1);
+      opacity: 1;
+    }
+    100% {
+      transform: translate(calc(50% + 120px), -48px) scale(0.2);
+      opacity: 0;
+    }
+  }
+  /* El ojo se abre (parpadeo), mira un momento y se recoge hacia el icono de estado. */
+  @keyframes ll-eye-in {
+    0% {
+      transform: scale(0.6, 0.05);
+      opacity: 0;
+    }
+    25% {
+      transform: scale(1.25, 0.2);
+      opacity: 1;
+    }
+    40% {
+      transform: scale(1.1, 1.1);
+    }
+    52% {
+      transform: scale(1, 1);
+    }
+    72% {
+      transform: scale(1, 1);
       opacity: 1;
     }
     100% {
@@ -764,10 +801,12 @@ body {
   }
   @media (prefers-reduced-motion: reduce) {
     .ll-shield-fx .shield,
+    .ll-shield-fx .eye,
     .ll-shield-fx .ring,
     .ll-seat.shielding,
     .ll-mine.shielding,
-    .ll-ico.prot {
+    .ll-ico.prot,
+    .ll-ico.spy {
       animation: none;
     }
   }

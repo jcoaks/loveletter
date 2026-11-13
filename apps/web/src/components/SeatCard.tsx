@@ -14,7 +14,7 @@ export function StatusIcons({ seat }: { seat: SeatData }) {
   if (seat.protected && !seat.shield) {
     items.push({ kind: 'prot', label: agree('Protegido', seat.gender) });
   }
-  if (seat.spyPlayed) items.push({ kind: 'spy', label: 'Espía jugado' });
+  if (seat.spyPlayed && !seat.eye) items.push({ kind: 'spy', label: 'Espía jugado' });
   if (seat.connected === false)
     items.push({ kind: 'off', label: agree('Desconectado', seat.gender) });
   return (
@@ -36,11 +36,12 @@ export type SeatMark = 'hit' | 'miss' | 'picked';
 
 /** Escudo que aparece sobre el cuadro al jugarse la Doncella y luego se recoge hacia el icono de estado. */
 export function ShieldFx({ seat }: { seat: SeatData }) {
-  if (seat.shield !== 'fx') return null;
+  if (seat.shield !== 'fx' && seat.eye !== 'fx') return null;
   return (
     <span className="ll-shield-fx" aria-hidden="true">
       <i className="ring" />
-      <i className="shield" />
+      {seat.shield === 'fx' && <i className="shield" />}
+      {seat.eye === 'fx' && <i className="eye" />}
     </span>
   );
 }
@@ -66,7 +67,7 @@ export function SeatCard({
     position,
     seat.eliminated && 'out',
     seat.isTurn && 'turnof',
-    seat.shield === 'fx' && 'shielding',
+    (seat.shield === 'fx' || seat.eye === 'fx') && 'shielding',
     mark,
   ]
     .filter(Boolean)
@@ -141,7 +142,7 @@ export function MineBar({
     'll-mine',
     seat.eliminated && 'out',
     seat.isTurn && 'turnof',
-    seat.shield === 'fx' && 'shielding',
+    (seat.shield === 'fx' || seat.eye === 'fx') && 'shielding',
   ]
     .filter(Boolean)
     .join(' ');

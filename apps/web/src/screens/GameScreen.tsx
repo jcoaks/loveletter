@@ -70,10 +70,14 @@ interface DiscardMove {
   src: 'play' | 'target';
   /** Quien descarta (para la procedencia si no hay aviso). */
   actorId: string;
-  /** Doncella: al llegar la carta al descarte se anima el escudo del jugador. */
-  shield?: boolean;
+  /** Doncella (escudo) o Espía (ojo): al llegar la carta al descarte se anima el icono del jugador. */
+  fx?: 'prot' | 'spy';
   launched?: boolean;
 }
+
+/** Qué icono de estado se anima al caer esta carta en el descarte (el Espía también cuenta si se descarta). */
+const fxOf = (card: CardValue): { fx?: 'prot' | 'spy' } =>
+  card === 4 ? { fx: 'prot' } : card === 0 ? { fx: 'spy' } : {};
 
 /** Todos los avisos de jugadas se cierran solos; cuanto más hay que leer, más tardan. */
 const NOTICE_PUBLIC_MS = 5000;
@@ -104,7 +108,7 @@ function useResults(ctx: TextContext, mode: NoticeMode) {
   const [moves, setMoves] = useState<DiscardMove[]>([]);
   const movesRef = useRef<DiscardMove[]>([]);
   movesRef.current = moves;
-  // Doncella: `wait` hasta que su carta cae en el descarte, `fx` mientras dura la animación del escudo.
+  // Escudo y ojo, por `jugador:tipo`: `wait` hasta que la carta cae en el descarte, `fx` mientras dura la animación.
   const [shields, setShields] = useState<Record<string, 'wait' | 'fx'>>({});
   const shieldTimers = useRef(new Set<string>());
   // Layout: los descartes nuevos se ocultan antes de pintar, para que no parpadeen antes de volar.
@@ -147,9 +151,11 @@ function useResults(ctx: TextContext, mode: NoticeMode) {
         gate,
         src: 'play',
         actorId,
-        ...(group.play.card === 4 ? { shield: true } : {}),
+        ...fxOf(group.play.card),
       });
-      if (group.play.card === 4) setShields((sh) => ({ ...sh, [actorId]: 'wait' }));
+      if (fxOf(group.play.card).fx) {
+        setShields((sh) => ({ ...sh, [`${actorId}:${fxOf(group.play.card).fx}`]: 'wait' }));
+      }
       const prince = group.effects.find((e) => e.type === 'prince');
       if (prince?.type === 'prince') {
         added.push({
@@ -159,7 +165,11 @@ function useResults(ctx: TextContext, mode: NoticeMode) {
           gate,
           src: 'target',
           actorId,
+          ...fxOf(prince.discarded),
         });
+        if (fxOf(prince.discarded).fx) {
+          setShields((sh) => ({ ...sh, [`${prince.targetId}:spy`]: 'wait' }));
+        }
       }
     }
     // Al terminar de elegir el Canciller, su carta pasa a esperar el aviso final (si lo hay); se
@@ -206,8 +216,8 @@ function useResults(ctx: TextContext, mode: NoticeMode) {
     shields,
     landMove: (id: string) => {
       const mv = movesRef.current.find((x) => x.id === id);
-      if (mv?.shield) {
-        const pid = mv.playerId;
+      if (mv?.fx) {
+        const pid = `${mv.playerId}:${mv.fx}`;
         const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
         setShields((sh) => {
           if (sh[pid] !== 'wait') return sh;
@@ -318,12 +328,14 @@ export function GameScreen() {
       me: {
         ...baseSeats.me,
         hiddenDiscards: heldDiscards[baseSeats.me.id] ?? 0,
-        shield: results.shields[baseSeats.me.id],
+        shield: results.shields[`${baseSeats.me.id}:prot`],
+        eye: results.shields[`${baseSeats.me.id}:spy`],
       },
       rivals: baseSeats.rivals.map((r) => ({
         ...r,
         hiddenDiscards: heldDiscards[r.id] ?? 0,
-        shield: results.shields[r.id],
+        shield: results.shields[`${r.id}:prot`],
+        eye: results.shields[`${r.id}:spy`],
         // La carta declarada ya salió de su mano: su hueco queda vacío mientras decide.
         hiddenBacks: (draws.pending[r.id] ?? 0) + (pending?.playerId === r.id ? 1 : 0),
       })),
