@@ -152,7 +152,18 @@ function useResults(ctx: TextContext, mode: NoticeMode) {
         });
       }
     }
-    if (added.length) setMoves((m) => [...m, ...added]);
+    // Al terminar de elegir el Canciller, su carta pasa a esperar el aviso final (si lo hay); se
+    // decide aquí, junto con la cola, para que nunca vuele con el aviso aún por abrirse.
+    const unlock = new Map<string, string | null>();
+    for (const e of fresh) {
+      if (e.type === 'chancellor_done') {
+        const key = `ev-${e.id}`;
+        unlock.set(`chancellor:${e.playerId}`, gated.has(key) ? key : null);
+      }
+    }
+    const resolve = (m: DiscardMove): DiscardMove =>
+      m.gate && unlock.has(m.gate) ? { ...m, gate: unlock.get(m.gate) ?? null } : m;
+    if (added.length || unlock.size) setMoves((m) => [...m, ...added].map(resolve));
     const light = results.filter(isToast);
     const quick = modals.filter((r) => !r.deferMs);
     if (quick.length) setQueue((q) => [...q, ...quick]);
@@ -285,15 +296,10 @@ export function GameScreen() {
   );
   // biome-ignore lint/correctness/useExhaustiveDependencies: solo cuando cambian las jugadas por descartar o los avisos abiertos
   useEffect(() => {
-    const chancellorOpen = (actorId: string) =>
-      [...results.queue, ...results.toasts].some(
-        (r) => r.other?.card === 6 && r.other.actorId === actorId,
-      );
     const ready = results.moves.filter((m) => {
       if (m.launched) return false;
       if (!m.gate) return true;
-      if (m.gate.startsWith('chancellor:'))
-        return game.phase !== 'chancellor' && !chancellorOpen(m.actorId);
+      if (m.gate.startsWith('chancellor:')) return false;
       return !openKeys.has(m.gate);
     });
     if (ready.length === 0) return;
@@ -334,7 +340,7 @@ export function GameScreen() {
     for (const f of flights) {
       window.setTimeout(() => results.landMove(f.id), (f.delay + 0.65 + 0.6) * 1000);
     }
-  }, [results.moves, openKeys, game.phase]);
+  }, [results.moves, openKeys]);
 
   const speech = useBotSpeech(room.chat, modalOpen, revealKeys);
   const busy =
