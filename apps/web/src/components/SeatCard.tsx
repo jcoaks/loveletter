@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { type CSSProperties, useLayoutEffect, useRef } from 'react';
 import { agree } from '../lib/gender';
 import { type SeatData, seatLabel } from '../lib/seat';
 import { CardBack, CardFan } from './Card';
@@ -9,20 +9,26 @@ import { Tokens } from './Token';
  * mover el nombre ni el resto del cuadro. El texto va en `aria-label` y `title`.
  */
 export function StatusIcons({ seat }: { seat: SeatData }) {
-  const items: { kind: 'out' | 'prot' | 'spy' | 'off'; label: string }[] = [];
+  const items: { kind: 'out' | 'prot' | 'spy' | 'off'; label: string; hold?: boolean }[] = [];
   if (seat.eliminated) items.push({ kind: 'out', label: agree('Eliminado', seat.gender) });
-  if (seat.protected && !seat.shield) {
-    items.push({ kind: 'prot', label: agree('Protegido', seat.gender) });
+  // Mientras la carta vuela o el escudo/ojo se anima, el icono ocupa su sitio sin verse: es el destino del recorrido.
+  if (seat.protected) {
+    items.push({
+      kind: 'prot',
+      label: agree('Protegido', seat.gender),
+      hold: Boolean(seat.shield),
+    });
   }
-  if (seat.spyPlayed && !seat.eye) items.push({ kind: 'spy', label: 'Espía jugado' });
+  if (seat.spyPlayed) items.push({ kind: 'spy', label: 'Espía jugado', hold: Boolean(seat.eye) });
   if (seat.connected === false)
     items.push({ kind: 'off', label: agree('Desconectado', seat.gender) });
   return (
     <span className="ll-st">
       {items.map((i) => (
         <i
-          key={i.kind}
-          className={`ll-ico ${i.kind}`}
+          // Al dejar de estar retenido se vuelve a montar: así el icono hace su rebote al aparecer.
+          key={`${i.kind}${i.hold ? '-hold' : ''}`}
+          className={`ll-ico ${i.kind}${i.hold ? ' hold' : ''}`}
           role="img"
           aria-label={i.label}
           title={i.label}
@@ -36,9 +42,32 @@ export type SeatMark = 'hit' | 'miss' | 'picked';
 
 /** Escudo que aparece sobre el cuadro al jugarse la Doncella y luego se recoge hacia el icono de estado. */
 export function ShieldFx({ seat }: { seat: SeatData }) {
-  if (seat.shield !== 'fx' && seat.eye !== 'fx') return null;
+  const ref = useRef<HTMLSpanElement>(null);
+  const active = seat.shield === 'fx' || seat.eye === 'fx';
+  // El recorrido final termina exactamente encima del icono de estado que va a quedar.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: se mide al empezar cada animación
+  useLayoutEffect(() => {
+    const root = ref.current;
+    const box = root?.closest('.ll-seat, .ll-mine');
+    if (!root || !box) return;
+    for (const [cls, ico] of [
+      ['shield', 'prot'],
+      ['eye', 'spy'],
+    ] as const) {
+      const fx = root.querySelector<HTMLElement>(`.${cls}`);
+      const target = box.querySelector(`.ll-st .ll-ico.${ico}`);
+      if (!fx || !target) continue;
+      const a = fx.getBoundingClientRect();
+      const b = target.getBoundingClientRect();
+      if (fx.offsetWidth === 0 || b.width === 0) continue;
+      fx.style.setProperty('--fx-dx', `${b.left + b.width / 2 - (a.left + a.width / 2)}px`);
+      fx.style.setProperty('--fx-dy', `${b.top + b.height / 2 - (a.top + a.height / 2)}px`);
+      fx.style.setProperty('--fx-s', String(b.width / fx.offsetWidth));
+    }
+  }, [active]);
+  if (!active) return null;
   return (
-    <span className="ll-shield-fx" aria-hidden="true">
+    <span className="ll-shield-fx" aria-hidden="true" ref={ref}>
       <i className="ring" />
       {seat.shield === 'fx' && <i className="shield" />}
       {seat.eye === 'fx' && <i className="eye" />}
